@@ -11,6 +11,12 @@ The project is pre-alpha: anything may change, including the RPC contract.
 
 Nothing yet.
 
+## [0.2.1] - 2026-11-22
+
+### Added
+
+- Badges for related/recommended product cards on store app pages.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
@@ -108,6 +114,7 @@ Nothing yet.
 - README with pre-alpha status, requirements, development commands, privacy
   and disclaimer sections.
 
-[Unreleased]: https://github.com/fabioudev/steam-ig-deals/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/fabioudev/steam-ig-deals/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/fabioudev/steam-ig-deals/releases/tag/v0.2.1
 [0.2.0]: https://github.com/fabioudev/steam-ig-deals/releases/tag/v0.2.0
 [0.1.0]: https://github.com/fabioudev/steam-ig-deals/releases/tag/v0.1.0

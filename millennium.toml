@@ -1,7 +1,7 @@
 [plugin]
 id = "com.fabioudev.igdeals"
 name = "IG Deals for Steam"
-version = "0.2.0"
+version = "0.2.1"
 author = "fabioudev"
 description = "Shows Instant Gaming prices and discounts on your Steam wishlist and store pages."
 
