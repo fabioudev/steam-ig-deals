@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Steam-Wunschliste</title>
+  </head>
+  <body>
+    <div id="wishlist_index_content">
+      <div id="wishlist_items">
+        <!-- Card with an aria-label, a Steam price and a percentage label. -->
+        <div class="Panel" data-index="0">
+          <div class="wishlist_row" data-appid="1245620">
+            <a
+              href="https://store.steampowered.com/app/1245620/ELDEN_RING/?snr=1_7_7_230_150_1"
+              aria-label="ELDEN RING"
+              class="capsule"
+            >
+              <img
+                src="https://cdn.akamai.steamstatic.com/steam/apps/1245620/header.jpg"
+                alt="ELDEN RING"
+              />
+            </a>
+            <div class="title">ELDEN RING</div>
+            <div class="discount_block">
+              <div class="discount_pct">-50%</div>
+              <div class="discount_final_price">59,99 €</div>
+            </div>
+            <div class="buttons">
+              <a href="https://store.steampowered.com/app/1245620/ELDEN_RING/">Store page</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Title comes from the anchor title; image alt is present for accessibility. -->
+        <div class="Panel" data-index="1">
+          <a
+            href="https://store.steampowered.com/app/1091500/Cyberpunk_2077/"
+            title="Cyberpunk 2077"
+          >
+            <img
+              src="https://cdn.akamai.steamstatic.com/steam/apps/1091500/header.jpg"
+              alt="Cyberpunk 2077"
+            />
+          </a>
+          <div class="price">39,99 €</div>
+        </div>
+
+        <!-- The same app again (hover preview / second component): must be deduplicated. -->
+        <div class="Panel" data-index="2">
+          <a href="https://store.steampowered.com/app/1245620/ELDEN_RING/">
+            <img src="https://cdn.akamai.steamstatic.com/steam/apps/1245620/header.jpg" alt="ELDEN RING" />
+          </a>
+        </div>
+
+        <!-- Non-app links must be ignored. -->
+        <div class="Panel" data-index="3">
+          <a href="https://store.steampowered.com/wishlist/profiles/76561198000000000/">
+            Deine Wunschliste
+          </a>
+          <a href="https://store.steampowered.com/bundle/1234/Some_Bundle/">Some Bundle</a>
+          <a href="https://store.steampowered.com/app/">Store</a>
+        </div>
+
+        <!-- Image alt supplies the title; the slug fallback is exercised in the test. -->
+        <div class="Panel" data-index="4">
+          <a href="https://store.steampowered.com/app/292030/The_Witcher_3_Wild_Hunt/">
+            <img
+              src="https://cdn.akamai.steamstatic.com/steam/apps/292030/header.jpg"
+              alt="The Witcher 3 Wild Hunt"
+            />
+          </a>
+          <div class="price">29,99 €</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Search results - Instant Gaming</title>
+</head>
+<body>
+    <!--
+      Trimmed copy of the Instant Gaming search page structure (2026-11-22).
+      Only the Algolia configuration block is kept; that is all
+      backend/config.lua parses. The credential values are synthetic: the real
+      app id/key are discovered at runtime and must not be committed to the
+      repository (see AGENTS.md).
+    -->
+    <script>
+        window.algoliaConfig = {
+            algolia_appid: 'TESTAPPID',
+            algolia_key: 'test-only-search-key',
+            algolia_index: 'produits_',
+                        regions: "(country_whitelist:\"DE\" OR country_whitelist:\"worldwide\" OR country_whitelist:\"WW\") AND (NOT country_blacklist:\"DE\")",
+            advanced_access_label: "Advanced access",
+                    };
+        window.searchIndexConfig = {"tags_url":"/search-index/tags.en.json?v=027d9e12","companies_url":"/search-index/companies.json?v=70d2e7b4"};
+    </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest an idea or improvement for IG Deals for Steam.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please read the
+        [design document](https://github.com/fabioudev/steam-ig-deals/blob/main/docs/design.md),
+        especially the goals and non-goals. Features that require buying
+        automation, other key resellers, or loading Instant Gaming inside
+        Steam's embedded browser are out of scope for v1.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what is missing or awkward today?
+      placeholder: When I browse my wishlist, I want to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would like. Mockups or sketches are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches or workarounds you have tried.
+    validations:
+      required: false
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope check
+      description: Does this fit the design's goals and constraints? Mention anything that might conflict (rate limits, caching, terms of service, CEF limitations).
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, links, or anything else that helps.
+    validations:
+      required: false

@@ -1,0 +1,35 @@
+{
+  "name": "steam-ig-deals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Millennium plugin that shows Instant Gaming prices and discounts on Steam wishlists and store pages.",
+  "license": "MIT",
+  "author": "fabioudev",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "starlight watch",
+    "build": "node scripts/pack.mjs",
+    "pack": "node scripts/pack.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:lua": "luajit tests/lua/run.lua",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run test:lua"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@steambrew/starlight": "1.1.7",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "happy-dom": "21.0.4",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
+  }
+}

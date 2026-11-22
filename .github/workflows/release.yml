@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check version consistency
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          plugin="$(sed -n 's/^version = "\(.*\)"/\1/p' millennium.toml | head -n1)"
+          echo "tag=$tag package.json=$pkg millennium.toml=$plugin"
+          if [ "$tag" != "$pkg" ] || [ "$tag" != "$plugin" ]; then
+            echo "::error::Tag, package.json and millennium.toml versions must match."
+            exit 1
+          fi
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Package release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          star="$(find dist -type f -name '*.star' -print -quit)"
+          if [ -z "$star" ]; then
+            echo "::error::No .star plugin artifact found in dist/."
+            exit 1
+          fi
+          name="steam-ig-deals-${version}"
+          mkdir -p release
+          cp "$star" "release/${name}.star"
+          cp LICENSE README.md release/
+          (cd release && zip -9 -r "../${name}.zip" .)
+          sha256sum "${name}.zip" > SHA256SUMS
+          (cd release && sha256sum "${name}.star") >> SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: IG Deals for Steam ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true
+          files: |
+            release/*.zip
+            release/*.star
+            SHA256SUMS

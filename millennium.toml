@@ -1,0 +1,37 @@
+[plugin]
+id = "com.fabioudev.igdeals"
+name = "IG Deals for Steam"
+version = "0.1.0"
+author = "fabioudev"
+description = "Shows Instant Gaming prices and discounts on your Steam wishlist and store pages."
+
+[assets]
+resources = ["resources/*.svg"]
+
+[backend]
+entry = "backend/main.lua"
+sources = ["backend/**/*.lua"]
+
+[frontend]
+entry = "frontend/index.tsx"
+
+[webkit]
+entry = "webview/preload.ts"
+
+[compiler]
+# "auto" installs the built plugin into the local Millennium installation.
+# CI passes an explicit output directory with `starlight pack -o dist`.
+output_path = "auto"
+
+[dev]
+auto_restart = true
+reload_steamui_when = "both"
+
+[logger]
+padding = 0
+backend_prefix = "BCK"
+frontend_prefix = "FRT"
+webview_prefix = "WEB"
+
+[patches]
+debug = false

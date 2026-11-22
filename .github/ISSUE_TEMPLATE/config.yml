@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Design document
+    url: https://github.com/fabioudev/steam-ig-deals/blob/main/docs/design.md
+    about: Read the goals, non-goals and architecture before filing a feature request.
+  - name: IPC contract
+    url: https://github.com/fabioudev/steam-ig-deals/blob/main/docs/ipc-contract.md
+    about: Request and response shapes shared by the webview, the frontend and the Lua backend.
+  - name: Report a security vulnerability
+    url: https://github.com/fabioudev/steam-ig-deals/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
+  - name: Contributing guide
+    url: https://github.com/fabioudev/steam-ig-deals/blob/main/CONTRIBUTING.md
+    about: Development setup, tests, code style and compliance rules.

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+release/
+SHA256SUMS
+.millennium/
+coverage/
+*.star
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+overrides.local.json

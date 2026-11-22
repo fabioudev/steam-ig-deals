@@ -1,0 +1,101 @@
+name: Bug report
+description: Report a problem with IG Deals for Steam.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. This project is
+        **pre-alpha**: parts of the plugin described in the README are not
+        implemented yet. Please read
+        [docs/design.md](https://github.com/fabioudev/steam-ig-deals/blob/main/docs/design.md)
+        and search existing issues before filing.
+
+        Do **not** report security vulnerabilities here. See
+        [SECURITY.md](https://github.com/fabioudev/steam-ig-deals/blob/main/SECURITY.md).
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: OS and version. On Linux, include the desktop session (X11 or Wayland).
+      placeholder: Windows 11 24H2 / Ubuntu 24.04, Wayland
+    validations:
+      required: true
+
+  - type: input
+    id: steam_version
+    attributes:
+      label: Steam client version
+      description: "Steam → Help → About Steam (client version or build timestamp)."
+    validations:
+      required: true
+
+  - type: input
+    id: millennium_version
+    attributes:
+      label: Millennium version
+      description: Shown in Steam → Millennium → Settings.
+    validations:
+      required: true
+
+  - type: input
+    id: plugin_version
+    attributes:
+      label: Plugin version
+      description: From the plugin settings page or the Millennium plugin list. For development builds, include the commit hash.
+      placeholder: 0.1.0 or main@abc1234
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the Steam wishlist.
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Screenshots can be dragged into this field.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and diagnostics
+      description: |
+        Paste relevant log lines. Millennium logs are available from the
+        Millennium dashboard; plugin diagnostics (once implemented) appear on
+        the plugin's settings page. Remove personal paths and account names
+        before posting.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and read the design document.
+          required: true
+        - label: This is not a security vulnerability (those go through SECURITY.md).
+          required: true
+        - label: I understand the plugin is pre-alpha and features may be missing.
+          required: true
