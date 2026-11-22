@@ -22,7 +22,7 @@ const STYLES = `
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 6px 0 0 8px;
+  margin: 2px 0 0 8px;
   padding: 3px 8px;
   border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -144,6 +144,24 @@ function findBadge(root: ParentNode): HTMLButtonElement | null {
   return root.querySelector<HTMLButtonElement>(BADGE_SELECTOR);
 }
 
+const PLACEMENT_SELECTORS = 'h1, h2, h3, h4, [role="heading"], .title, a[href*="/app/"]';
+
+/**
+ * Prefer an element inside the card that carries the game title, so the badge
+ * sits next to the title instead of being appended to the row's bottom edge
+ * (which makes it look like it belongs to the next card).
+ */
+function findPlacementAnchor(container: HTMLElement): HTMLElement | null {
+  for (const node of container.querySelectorAll<HTMLElement>(PLACEMENT_SELECTORS)) {
+    const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (text.length < 2 || text.length > 120) continue;
+    if (/^[\d\s.,:€$£%+\-–—]+$/.test(text)) continue;
+    return node;
+  }
+
+  return container.querySelector<HTMLElement>('[data-price-final]');
+}
+
 /** Create or update the badge inside one wishlist card. */
 export function upsertCardBadge(
   card: WishlistCard,
@@ -161,7 +179,12 @@ export function upsertCardBadge(
   let badge = findBadge(container);
   if (!badge) {
     badge = createBadge(doc, onOpen, false);
-    container.appendChild(badge);
+    const anchor = findPlacementAnchor(container);
+    if (anchor?.parentElement) {
+      anchor.insertAdjacentElement('afterend', badge);
+    } else {
+      container.appendChild(badge);
+    }
   }
 
   updateBadge(badge, display, doc, card.appid);

@@ -109,6 +109,7 @@ async function requestPrices(cards: WishlistCard[], currentGeneration: number): 
 
 async function refreshWishlist(currentGeneration: number): Promise<void> {
   const initialCards = collectWishlistCards(document);
+  console.log(`[igdeals] wishlist cards found: ${initialCards.length}`);
   if (initialCards.length === 0) return;
 
   await requestPrices(initialCards, currentGeneration);
@@ -260,6 +261,7 @@ export default function startIgDeals(): void {
   if (started) return;
   started = true;
 
+  console.log('[igdeals] preload attached', window.location.href);
   lastUrl = window.location.href;
   settings = loadWishlistSettings();
   installNavigationHooks();
