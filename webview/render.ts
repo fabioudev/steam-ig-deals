@@ -130,6 +130,9 @@ const STYLES = `
   pointer-events: auto;
   transform: translateY(calc(-100% - 6px));
 }
+.igdeals-badge--corner {
+  transform: none;
+}
 `;
 
 export type OpenUrl = (url: string) => void;

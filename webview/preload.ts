@@ -16,6 +16,10 @@ import type { GetPricesRequest, GetPricesResponse, PriceResult } from '@shared/t
 import { buildBadgeDisplay, hiddenReason } from './badge-model';
 import { openExternalUrl } from './external-link';
 import {
+  collectAppPageExtras,
+  collectSearchCards,
+  collectStoreCards,
+  collectSuggestionCards,
   collectWishlistCards,
   detectPage,
   extractAppPageGame,
@@ -27,7 +31,9 @@ import {
   attachOverlayListeners,
   clearOverlay,
   hasOverlayEntries,
+  isElementClipped,
   isOverlayAttached,
+  isTopmostAtCenter,
   pruneOverlay,
   reattachOverlay,
   removeOverlayBadge,
@@ -126,7 +132,12 @@ async function requestPrices(cards: WishlistCard[], currentGeneration: number): 
   const backendClient = getPricesBackend();
   if (!backendClient) return;
 
-  const missing = cards.filter((card) => !results.has(card.appid) && !inFlight.has(card.appid));
+  const unique = new Map<number, WishlistCard>();
+  for (const card of cards) {
+    if (results.has(card.appid) || inFlight.has(card.appid) || unique.has(card.appid)) continue;
+    unique.set(card.appid, card);
+  }
+  const missing = [...unique.values()];
   if (missing.length === 0) return;
 
   for (const batch of chunk(missing, BATCH_SIZE)) {
@@ -268,6 +279,95 @@ async function refreshApp(appid: number, currentGeneration: number): Promise<voi
   upsertStoreBadge(appid, display, openExternalUrl);
 }
 
+function isNearViewport(element: HTMLElement): boolean {
+  const rect = element.getBoundingClientRect();
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.bottom > -240 &&
+    rect.top < window.innerHeight + 240 &&
+    rect.right > -240 &&
+    rect.left < window.innerWidth + 240 &&
+    !isElementClipped(element) &&
+    isTopmostAtCenter(element)
+  );
+}
+
+/**
+ * Badges for the main shop page, search results and search suggestions.
+ * Only cards near the viewport are queried; scrolling triggers a refresh that
+ * picks up newly visible cards. The backend cache makes repeats free.
+ */
+async function refreshStoreList(
+  kind: 'search' | 'store',
+  currentGeneration: number,
+): Promise<void> {
+  const baseCards = kind === 'search' ? collectSearchCards(document) : collectStoreCards(document);
+  const cards: WishlistCard[] = [];
+  const seenElements = new Set<HTMLElement>();
+  for (const card of [...baseCards, ...collectSuggestionCards(document)]) {
+    if (seenElements.has(card.element)) continue;
+    seenElements.add(card.element);
+    cards.push(card);
+  }
+  if (cards.length === 0) return;
+
+  const visible = cards.filter((card) => isNearViewport(card.element));
+  if (getPricesBackend()) {
+    for (const card of visible) showOverlaySkeleton(card);
+  }
+
+  await requestPrices(visible, currentGeneration);
+  if (currentGeneration !== generation) return;
+
+  const locale = getLocale();
+  for (const card of cards) {
+    const result = results.get(card.appid);
+    if (!result) continue;
+
+    const steamPrice = extractSteamPrice(findPriceScope(card.element), settings.currency);
+    const display = buildBadgeDisplay(result, steamPrice, locale, settings.country);
+    if (!display) {
+      removeOverlayBadge(card.appid);
+      continue;
+    }
+    showOverlayBadge(card, display, document, openExternalUrl);
+  }
+
+  pruneOverlay(new Set(cards.map((card) => card.appid)));
+  scheduleOverlayPosition();
+}
+
+async function refreshAppExtras(primaryAppId: number, currentGeneration: number): Promise<void> {
+  const cards = collectAppPageExtras(document, primaryAppId);
+  if (cards.length === 0) return;
+
+  const visible = cards.filter((card) => isNearViewport(card.element));
+  if (getPricesBackend()) {
+    for (const card of visible) showOverlaySkeleton(card);
+  }
+
+  await requestPrices(visible, currentGeneration);
+  if (currentGeneration !== generation) return;
+
+  const locale = getLocale();
+  for (const card of cards) {
+    const result = results.get(card.appid);
+    if (!result) continue;
+
+    const steamPrice = extractSteamPrice(findPriceScope(card.element), settings.currency);
+    const display = buildBadgeDisplay(result, steamPrice, locale, settings.country);
+    if (!display) {
+      removeOverlayBadge(card.appid);
+      continue;
+    }
+    showOverlayBadge(card, display, document, openExternalUrl);
+  }
+
+  pruneOverlay(new Set(cards.map((card) => card.appid)));
+  scheduleOverlayPosition();
+}
+
 async function refresh(): Promise<void> {
   if (!settings.badgeEnabled) {
     clearOverlay();
@@ -280,6 +380,9 @@ async function refresh(): Promise<void> {
     await refreshWishlist(generation);
   } else if (page.kind === 'app' && page.appid !== null) {
     await refreshApp(page.appid, generation);
+    await refreshAppExtras(page.appid, generation);
+  } else if (page.kind === 'search' || page.kind === 'store') {
+    await refreshStoreList(page.kind, generation);
   }
 }
 
@@ -379,6 +482,39 @@ function installNavigationHooks(): void {
 
   window.addEventListener('popstate', onNavigation);
   window.addEventListener('hashchange', onNavigation);
+
+  // Load badges for cards that scroll into view on shop/search pages.
+  document.addEventListener(
+    'scroll',
+    () => {
+      const page = detectPage(window.location.href);
+      if (page.kind === 'search' || page.kind === 'store' || page.kind === 'app')
+        scheduleRefresh(200);
+    },
+    { capture: true, passive: true },
+  );
+
+  // Carousels switch with clicks/transforms (no scroll or childList change);
+  // refresh visibly after clicks and periodically for autoplaying carousels.
+  document.addEventListener(
+    'click',
+    () => {
+      const page = detectPage(window.location.href);
+      if (page.kind === 'store' || page.kind === 'search' || page.kind === 'app') {
+        scheduleOverlayPosition();
+        scheduleRefresh(120);
+      }
+    },
+    true,
+  );
+
+  window.setInterval(() => {
+    const page = detectPage(window.location.href);
+    if (page.kind === 'store' || page.kind === 'search' || page.kind === 'app') {
+      scheduleOverlayPosition();
+      scheduleRefresh(0);
+    }
+  }, 2000);
 }
 
 /**

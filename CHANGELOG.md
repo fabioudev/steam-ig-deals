@@ -35,6 +35,14 @@ The project is pre-alpha: anything may change, including the RPC contract.
   positioned above the add-to-cart button (falling back to the price element),
   repositioned on scroll/resize, so card re-renders can no longer remove them
   and make them flash away.
+- Badges now cover the shop home page (mixed card formats, sections, carousels),
+  search results and search suggestions. Only cards near the viewport are
+  queried; scrolling loads more and skeletons bridge the request. Cards without
+  a price/cart anchor get a compact corner badge.
+- Carousel-aware: badges for slides hidden by overflow clipping are suppressed,
+  and clicks/periodic checks keep badges in sync when slides switch or autoplay.
+- Store app pages now also badge DLC rows and purchase editions/packages. DLCs
+  use their appid; packages get a synthetic key and are matched by name.
 - The overlay is placed inside the wishlist's scroll container and uses content
   coordinates, so Chromium's compositor scrolls the badges with the cards
   instead of JavaScript updates lagging behind.

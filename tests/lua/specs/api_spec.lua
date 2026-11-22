@@ -177,8 +177,8 @@ return function(t)
         end
         t.assert_eq(elden_queries, 1)
         t.assert_eq(state.cache:count_prices(), 2)
-        t.assert_eq(#state.sleeps, 2, "one 250ms pause per unique query")
-        t.assert_eq(state.sleeps[1], 250)
+        t.assert_eq(#state.sleeps, 2, "one pause per unique query")
+        t.assert_eq(state.sleeps[1], 60)
         t.assert_eq(type(response.fetched_at), "number")
     end)
 
@@ -366,6 +366,22 @@ return function(t)
         }))
         t.assert_eq(response.results[1].error, "invalid_game")
         t.assert_eq(response.results[2].error, "invalid_game")
+    end)
+
+    t.test("api: negative synthetic packappids resolve by name", function()
+        local service, state = make_api({
+            responses = {
+                ["DREDGE - Digital Deluxe Edition"] = { status = 200, body = fixture_text },
+            },
+        })
+
+        local response = service:get_prices(base_request({
+            { appid = -1001114568, name = "DREDGE - Digital Deluxe Edition" },
+        }))
+
+        t.assert_eq(response.results[1].appid, -1001114568)
+        t.assert_eq(#state.algolia.calls, 1)
+        t.assert_true(response.results[1].error ~= "invalid_game")
     end)
 
     t.test("api: status reports index, config age, cached games and TTL", function()

@@ -32,6 +32,17 @@ function makeCard(appid: number): WishlistCard {
     height: 40,
     toJSON: () => ({}),
   });
+  element.getBoundingClientRect = () => ({
+    x: 50,
+    y: 180,
+    left: 50,
+    top: 180,
+    right: 350,
+    bottom: 280,
+    width: 300,
+    height: 100,
+    toJSON: () => ({}),
+  });
 
   return { appid, name: 'Game', element, anchor: document.createElement('a') };
 }
@@ -48,13 +59,14 @@ function display(): BadgeDisplay {
 }
 
 beforeEach(() => {
+  window.history.replaceState({}, '', '/');
   document.body.innerHTML = '';
   document.getElementById('igdeals-overlay')?.remove();
   clearOverlay();
 });
 
 describe('overlay badges', () => {
-  it('places a badge outside the card in a fixed overlay', () => {
+  it('uses the card corner on shop pages', () => {
     const card = makeCard(1);
     document.body.appendChild(card.element);
     const onOpen = vi.fn();
@@ -67,15 +79,17 @@ describe('overlay badges', () => {
     const badge = overlay?.querySelector<HTMLButtonElement>('[data-igdeals-badge]');
     expect(badge).not.toBeNull();
     expect(card.element.querySelector('[data-igdeals-badge]')).toBeNull();
-    expect(badge?.style.right).toBe(`${window.innerWidth - 300}px`);
-    expect(badge?.style.top).toBe('200px');
+    expect(badge?.classList.contains('igdeals-badge--corner')).toBe(true);
+    expect(badge?.style.right).toBe(`${window.innerWidth - 350 + 6}px`);
+    expect(badge?.style.top).toBe('186px');
     expect(badge?.textContent).toContain('2,37');
 
     badge?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(onOpen).toHaveBeenCalled();
   });
 
-  it('positions the badge above the add-to-cart button', () => {
+  it('positions the wishlist badge above the add-to-cart button', () => {
+    window.history.replaceState({}, '', '/wishlist/id/test/');
     const card = makeCard(1);
     const cart = document.createElement('button');
     cart.textContent = 'In den Warenkorb';
@@ -98,6 +112,39 @@ describe('overlay badges', () => {
     const badge = document.querySelector<HTMLElement>('#igdeals-overlay [data-igdeals-badge]');
     expect(badge?.style.right).toBe(`${window.innerWidth - 400}px`);
     expect(badge?.style.top).toBe('250px');
+  });
+
+  it('uses a corner badge for cards without a price or cart button', () => {
+    const element = document.createElement('a');
+    element.className = 'Panel';
+    element.setAttribute('data-ds-appid', '7');
+    element.setAttribute('href', 'https://store.steampowered.com/app/7/Game/');
+    element.textContent = 'Game';
+    element.getBoundingClientRect = () => ({
+      x: 100,
+      y: 200,
+      left: 100,
+      top: 200,
+      right: 300,
+      bottom: 240,
+      width: 200,
+      height: 40,
+      toJSON: () => ({}),
+    });
+    document.body.appendChild(element);
+
+    const card: WishlistCard = {
+      appid: 7,
+      name: 'Game',
+      element: element as HTMLElement,
+      anchor: element,
+    };
+    showOverlayBadge(card, display(), document, vi.fn());
+
+    const badge = document.querySelector<HTMLElement>('#igdeals-overlay [data-igdeals-badge]');
+    expect(badge?.classList.contains('igdeals-badge--corner')).toBe(true);
+    expect(badge?.style.right).toBe(`${window.innerWidth - 300 + 6}px`);
+    expect(badge?.style.top).toBe('206px');
   });
 
   it('replaces a skeleton with the real badge', () => {

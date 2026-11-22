@@ -152,6 +152,11 @@ store app pages the same badge is placed above the purchase box. External links
 open in the system browser. If the remote logo cannot be loaded, the badge
 falls back to price and discount only. While prices are loading, a pulsing
 skeleton occupies the badge slot, so the list does not appear to load twice.
+The shop home page, search results and search suggestions are covered too:
+visible cards are looked up first, scrolling loads more, and cards without a
+price/cart anchor get a compact corner badge. Badges for slides hidden by a
+carousel's overflow clipping are suppressed; clicks and a periodic check keep
+the badges in sync when a carousel switches slides or autoplays.
 Wishlist badges live in a fixed overlay outside Steam's React root and are
 positioned over each card's add-to-cart button (falling back to the price
 element) via `getBoundingClientRect`, updated on scroll and resize. React card

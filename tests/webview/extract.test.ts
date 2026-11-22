@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  collectAppPageExtras,
+  collectSearchCards,
+  collectStoreCards,
+  collectSuggestionCards,
   collectWishlistCards,
   collectWishlistGames,
   detectPage,
@@ -101,6 +105,84 @@ describe('page detection', () => {
       appid: null,
     });
     expect(detectPage('not a url')).toEqual({ kind: 'other', appid: null });
+  });
+
+  it('recognises the shop home and search pages', () => {
+    expect(detectPage('https://store.steampowered.com/')).toEqual({ kind: 'store', appid: null });
+    expect(detectPage('https://store.steampowered.com/search/?term=elden')).toEqual({
+      kind: 'search',
+      appid: null,
+    });
+  });
+});
+
+describe('shop and search extraction', () => {
+  it('collects search result rows', () => {
+    document.body.innerHTML = `
+      <a class="search_result_row" data-ds-appid="1245620" href="https://store.steampowered.com/app/1245620/ELDEN_RING/">
+        <span class="title">ELDEN RING</span>
+        <div class="discount_block"><div class="discount_final_price">59,99€</div></div>
+      </a>
+    `;
+
+    const cards = collectSearchCards(document);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.appid).toBe(1245620);
+    expect(cards[0]?.name).toBe('ELDEN RING');
+  });
+
+  it('collects store cards from data-ds-appid', () => {
+    document.body.innerHTML = `
+      <a class="tab_row_item" data-ds-appid="5196330" href="https://store.steampowered.com/app/5196330/IT_THINKS/">
+        <img alt="IT THINKS! - Build Your Own GPU">
+        <div class="tab_item_title">IT THINKS! - Build Your Own GPU</div>
+        <div class="tab_item_price"><div class="discount_block">-20% 15,99€</div></div>
+      </a>
+    `;
+
+    const cards = collectStoreCards(document);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.appid).toBe(5196330);
+    expect(cards[0]?.name).toBe('IT THINKS! - Build Your Own GPU');
+  });
+
+  it('collects search suggestion rows', () => {
+    document.body.innerHTML = `
+      <a class="match match_app" data-ds-appid="1245620" href="https://store.steampowered.com/app/1245620/ELDEN_RING">
+        <div class="match_name">ELDEN RING</div>
+        <div class="match_subtitle">59,99€</div>
+      </a>
+    `;
+
+    const cards = collectSuggestionCards(document);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.appid).toBe(1245620);
+    expect(cards[0]?.name).toBe('ELDEN RING');
+  });
+
+  it('collects DLC rows and purchase editions on an app page', () => {
+    document.body.innerHTML = `
+      <div id="appHubAppName">ELDEN RING</div>
+      <a class="game_area_dlc_row" data-ds-appid="3655690" href="https://store.steampowered.com/app/3655690/Tarnished_Pack/">
+        <div class="game_area_dlc_name">ELDEN RING Tarnished Pack</div>
+      </a>
+      <div class="game_area_purchase_game" id="game_area_purchase_section_add_to_cart_440408">
+        <input type="hidden" name="subid" value="440408" />
+        <h2 class="title">Buy ELDEN RING</h2>
+      </div>
+      <div class="game_area_purchase_game" id="game_area_purchase_section_add_to_cart_1010505">
+        <input type="hidden" name="subid" value="1010505" />
+        <h2 class="title">Buy ELDEN RING Shadow of the Erdtree Edition</h2>
+      </div>
+    `;
+
+    const cards = collectAppPageExtras(document, 1245620);
+    expect(cards.map((card) => card.name)).toEqual([
+      'ELDEN RING Tarnished Pack',
+      'ELDEN RING Shadow of the Erdtree Edition',
+    ]);
+    expect(cards[0]?.appid).toBe(3655690);
+    expect(cards[1]?.appid).toBe(-1001010505);
   });
 });
 

@@ -14,7 +14,7 @@
 
 import type { SteamGame } from '@shared/types';
 
-export type PageKind = 'wishlist' | 'app' | 'other';
+export type PageKind = 'wishlist' | 'app' | 'search' | 'store' | 'other';
 
 export interface PageInfo {
   kind: PageKind;
@@ -78,9 +78,14 @@ export function detectPage(url: string): PageInfo {
 
   if (!STORE_HOST_RE.test(parsed.hostname)) return { kind: 'other', appid: null };
   if (WISHLIST_PATH_RE.test(parsed.pathname)) return { kind: 'wishlist', appid: null };
+  if (/^\/search\/?$/i.test(parsed.pathname)) return { kind: 'search', appid: null };
 
   const appid = extractAppIdFromHref(parsed.pathname);
-  return appid === null ? { kind: 'other', appid: null } : { kind: 'app', appid };
+  if (appid !== null) return { kind: 'app', appid };
+  if (parsed.pathname === '/' || parsed.pathname === '') {
+    return { kind: 'store', appid: null };
+  }
+  return { kind: 'other', appid: null };
 }
 
 function containsOtherApp(element: Element, appid: number): boolean {
@@ -216,6 +221,286 @@ export function collectWishlistGames(root: ParentNode = document): SteamGame[] {
   return collectWishlistCards(root).map(({ appid, name }) => ({ appid, name }));
 }
 
+const STORE_NAME_SELECTORS = [
+  '.title',
+  '.match_name',
+  '.tab_item_title',
+  '[class*="item_title"]',
+  '[class*="app_name"]',
+  '[class*="capsule_title"]',
+];
+
+function elementAppId(element: Element): number | null {
+  for (const attribute of ['data-ds-appid', 'data-appid', 'data-steam-appid']) {
+    const value = element.getAttribute(attribute);
+    if (value && /^\d+$/.test(value)) return Number(value);
+  }
+
+  const itemKey = element.getAttribute('data-ds-itemkey');
+  const appMatch = /^App_(\d+)$/.exec(itemKey ?? '');
+  if (appMatch?.[1]) return Number(appMatch[1]);
+
+  return extractAppIdFromHref(element.getAttribute('href'));
+}
+
+function hasOtherApp(element: Element, appid: number): boolean {
+  for (const link of element.querySelectorAll<HTMLAnchorElement>('a[href*="/app/"]')) {
+    const id = extractAppIdFromHref(link.getAttribute('href'));
+    if (id !== null && id !== appid) return true;
+  }
+  return false;
+}
+
+function appIdFromImageUrl(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = /\/apps\/(\d+)\//.exec(value);
+  if (!match?.[1]) return null;
+  const appid = Number(match[1]);
+  return Number.isSafeInteger(appid) && appid > 0 ? appid : null;
+}
+
+function imageAppId(image: HTMLImageElement): number | null {
+  for (const attribute of ['src', 'data-delayed-image', 'data-src', 'data-lazy-src', 'srcset']) {
+    const id = appIdFromImageUrl(image.getAttribute(attribute));
+    if (id !== null) return id;
+  }
+  return null;
+}
+
+function hasOtherImageApp(element: Element, appid: number): boolean {
+  for (const image of element.querySelectorAll<HTMLImageElement>('img')) {
+    const id = imageAppId(image);
+    if (id !== null && id !== appid) return true;
+  }
+  for (const node of element.querySelectorAll<HTMLElement>('[style*="apps/"]')) {
+    const id = appIdFromImageUrl(node.getAttribute('style'));
+    if (id !== null && id !== appid) return true;
+  }
+  return false;
+}
+
+/** Walk outwards from a capsule image/background to its card container. */
+function findImageCard(start: HTMLElement, appid: number): HTMLElement {
+  let best: HTMLElement = start;
+  let node: HTMLElement | null = start;
+
+  for (let depth = 0; node && depth < 8; depth += 1) {
+    if (hasOtherApp(node, appid) || hasOtherImageApp(node, appid)) break;
+    if (
+      node.querySelector('[class*="title"], [class*="name"], [class*="price"]') ||
+      node.querySelector('img')
+    ) {
+      best = node;
+    }
+    if (node === document.body) break;
+    node = node.parentElement;
+  }
+
+  return best;
+}
+
+/** Walk outwards from an app link to its card, stopping at other games. */
+function findAnchorCard(anchor: HTMLAnchorElement, appid: number): HTMLElement {
+  let best: HTMLElement = anchor;
+  let node: HTMLElement | null = anchor;
+
+  for (let depth = 0; node && depth < 8; depth += 1) {
+    if (hasOtherApp(node, appid)) break;
+    if (node.querySelector('img') || node.querySelector('[class*="title"], [class*="name"]')) {
+      best = node;
+    }
+    if (node === document.body) break;
+    node = node.parentElement;
+  }
+
+  return best;
+}
+
+function elementName(element: Element, appid: number): string | null {
+  for (const selector of STORE_NAME_SELECTORS) {
+    const name = cleanName(element.querySelector(selector)?.textContent);
+    if (name) return name;
+  }
+
+  const imageName = cleanName(element.querySelector('img[alt]')?.getAttribute('alt'));
+  if (imageName) return imageName;
+
+  const link = element.matches('a[href*="/app/"]')
+    ? element
+    : element.querySelector('a[href*="/app/"]');
+  return nameFromHref(link?.getAttribute('href') ?? '', appid);
+}
+
+/** Cards on the store search results page. */
+export function collectSearchCards(root: ParentNode = document): WishlistCard[] {
+  const cards: WishlistCard[] = [];
+  const seen = new Set<number>();
+
+  for (const row of root.querySelectorAll<HTMLAnchorElement>(
+    'a.search_result_row[data-ds-appid]',
+  )) {
+    const appid = elementAppId(row);
+    if (appid === null || seen.has(appid)) continue;
+    const name = elementName(row, appid);
+    if (!name) continue;
+    seen.add(appid);
+    cards.push({ appid, name, element: row, anchor: row });
+  }
+
+  return cards;
+}
+
+/**
+ * App cards throughout the main shop page. The page mixes many formats, so
+ * this covers explicit `data-*-appid` cards first and then falls back to any
+ * app link, walking outwards to the nearest single-game card container.
+ */
+export function collectStoreCards(root: ParentNode = document): WishlistCard[] {
+  const cards: WishlistCard[] = [];
+
+  const overlaps = (element: HTMLElement): boolean =>
+    cards.some(
+      (card) =>
+        card.element === element ||
+        card.element.contains(element) ||
+        element.contains(card.element),
+    );
+
+  const add = (element: HTMLElement, appid: number, anchor: HTMLAnchorElement | null): void => {
+    if (overlaps(element)) return;
+    if (
+      !element.querySelector('img') &&
+      !element.querySelector('[class*="title"], [class*="name"]')
+    ) {
+      return;
+    }
+    const name = elementName(element, appid);
+    if (!name) return;
+    cards.push({ appid, name, element, anchor: anchor ?? (element as HTMLAnchorElement) });
+  };
+
+  for (const node of root.querySelectorAll<HTMLElement>(
+    '[data-ds-appid], [data-appid], [data-steam-appid]',
+  )) {
+    if (node.closest('a.search_result_row, a.match')) continue;
+    const appid = elementAppId(node);
+    if (appid === null) continue;
+    if (hasOtherApp(node, appid)) continue; // Section wrapper, not a card.
+    const anchor = node.matches('a[href*="/app/"]')
+      ? (node as HTMLAnchorElement)
+      : node.querySelector<HTMLAnchorElement>('a[href*="/app/"]');
+    add(node, appid, anchor);
+  }
+
+  for (const anchor of root.querySelectorAll<HTMLAnchorElement>('a[href*="/app/"]')) {
+    if (anchor.closest('a.search_result_row, a.match')) continue;
+    const appid = extractAppIdFromHref(anchor.getAttribute('href'));
+    if (appid === null) continue;
+    add(findAnchorCard(anchor, appid), appid, anchor);
+  }
+
+  // Carousels and featured banners often expose the appid only through the
+  // capsule image URL, without data attributes or app links.
+  for (const image of root.querySelectorAll<HTMLImageElement>('img')) {
+    const appid = imageAppId(image);
+    if (appid === null) continue;
+    add(findImageCard(image, appid), appid, image.closest<HTMLAnchorElement>('a[href*="/app/"]'));
+  }
+
+  for (const node of root.querySelectorAll<HTMLElement>('[style*="apps/"]')) {
+    const appid = appIdFromImageUrl(node.getAttribute('style'));
+    if (appid === null) continue;
+    add(
+      findImageCard(node, appid),
+      appid,
+      node.querySelector<HTMLAnchorElement>('a[href*="/app/"]'),
+    );
+  }
+
+  return cards;
+}
+
+/** Rows in Steam's search autocomplete dropdown. */
+export function collectSuggestionCards(root: ParentNode = document): WishlistCard[] {
+  const cards: WishlistCard[] = [];
+  const seen = new Set<number>();
+
+  for (const row of root.querySelectorAll<HTMLAnchorElement>('a.match[data-ds-appid]')) {
+    const appid = elementAppId(row);
+    if (appid === null || seen.has(appid)) continue;
+    const name =
+      cleanName(row.querySelector('.match_name')?.textContent) ?? elementName(row, appid);
+    if (!name) continue;
+    seen.add(appid);
+    cards.push({ appid, name, element: row, anchor: row });
+  }
+
+  return cards;
+}
+
+/**
+ * DLC rows and purchase editions/packages on a store app page. DLCs are normal
+ * appids; packages have no appid, so they get a synthetic negative id and are
+ * matched by name.
+ */
+export function collectAppPageExtras(
+  root: ParentNode = document,
+  primaryAppId: number | null = null,
+): WishlistCard[] {
+  const cards: WishlistCard[] = [];
+  const seen = new Set<number>();
+  const primaryName = cleanName(root.querySelector('#appHubAppName, .apphub_AppName')?.textContent);
+
+  for (const row of root.querySelectorAll<HTMLElement>(
+    'a.game_area_dlc_row[data-ds-appid], .game_area_dlc_row[data-ds-appid]',
+  )) {
+    const appid = elementAppId(row);
+    if (appid === null || appid === primaryAppId || seen.has(appid)) continue;
+
+    let name: string | null = null;
+    const nameElement = row.querySelector('.game_area_dlc_name');
+    if (nameElement) {
+      const clone = nameElement.cloneNode(true) as HTMLElement;
+      // "New"/"Neu"/... highlight labels are part of the name container.
+      clone.querySelector('.dlc_highlight_reason_container')?.remove();
+      name = cleanName(clone.textContent);
+    }
+    name = name ?? elementName(row, appid);
+    if (!name) continue;
+
+    seen.add(appid);
+    cards.push({ appid, name, element: row, anchor: row as HTMLAnchorElement });
+  }
+
+  for (const game of root.querySelectorAll<HTMLElement>('.game_area_purchase_game')) {
+    const rawTitle = cleanName(game.querySelector('h2.title, .title')?.textContent);
+    const title = rawTitle
+      ?.replace(/^Buy\s+/i, '')
+      .replace(/\s+(?:kaufen|buy|purchase|acheter|comprar|acquista|compra)\s*$/i, '')
+      .trim();
+    if (!title) continue;
+    if (primaryName && title.toLowerCase() === primaryName.toLowerCase()) continue;
+
+    const subid = game.querySelector<HTMLInputElement>('input[name="subid"]')?.value;
+    const idMatch = /add_to_cart_(\d+)/.exec(game.id);
+    const packageId = Number(subid ?? idMatch?.[1] ?? Number.NaN);
+    if (!Number.isFinite(packageId) || packageId <= 0) continue;
+
+    const synthetic = -(1_000_000_000 + packageId);
+    if (seen.has(synthetic)) continue;
+    seen.add(synthetic);
+
+    cards.push({
+      appid: synthetic,
+      name: title,
+      element: game,
+      anchor: (game.querySelector('a[href*="/app/"]') ?? game) as HTMLAnchorElement,
+    });
+  }
+
+  return cards;
+}
+
 /**
  * The card container used for badge placement can be narrower than the row
  * that also holds Steam's price (hover previews and nested app links make the
@@ -249,6 +534,9 @@ export function findPriceElement(container: HTMLElement): HTMLElement | null {
     '.discount_block, .discount_block_large',
   );
   if (legacyBlock) return legacyBlock;
+
+  const priceLike = container.querySelector<HTMLElement>('[data-price-final], [class*="price"]');
+  if (priceLike) return priceLike;
 
   for (const node of container.querySelectorAll<HTMLElement>('[role="link"], a')) {
     const label = node.getAttribute('aria-label') ?? '';

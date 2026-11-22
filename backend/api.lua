@@ -9,7 +9,7 @@ local M = {}
 M.__index = M
 
 M.MAX_BATCH = 100
-M.QUERY_DELAY_MS = 250
+M.QUERY_DELAY_MS = 60
 
 local function error_result(appid, message)
     return { appid = appid, status = "error", error = tostring(message) }
@@ -114,7 +114,9 @@ end
 
 function M:_resolve(game, country, currency, force, ctx)
     local appid = tonumber(game.appid) or 0
-    if appid <= 0 or type(game.name) ~= "string" or game.name == "" then
+    -- Negative appids are synthetic keys for shop packages/editions without a
+    -- Steam appid; they are resolved purely by name.
+    if appid ~= math.floor(appid) or appid == 0 or type(game.name) ~= "string" or game.name == "" then
         return error_result(appid, "invalid_game")
     end
 
@@ -130,7 +132,7 @@ function M:_resolve(game, country, currency, force, ctx)
     end
 
     local hits, err = self:_query_with_recovery(game.name, country, ctx)
-    -- Keep requests sequential; ~250 ms between Algolia calls.
+    -- Keep requests sequential; a short pause between Algolia calls.
     self.sleep(self.query_delay_ms)
     if not hits then
         return error_result(appid, tostring(err or "query_failed"))

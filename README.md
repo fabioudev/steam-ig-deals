@@ -21,6 +21,9 @@ at — no manual searching, no copy-pasting titles.
   price (incl. VAT) and savings vs. Steam
 - Price line on store app pages, placed above the purchase box, with a direct
   link to the product
+- Badges on the shop home page (sections, charts, carousels), search results and
+  the search suggestion dropdown; only visible cards are looked up and loading
+  skeletons bridge the request
 - Experimental IG sorting (currently disabled: reordering Steam's virtualized
   wishlist from outside React proved unstable while scrolling). Wishlist badges
   are unaffected.
