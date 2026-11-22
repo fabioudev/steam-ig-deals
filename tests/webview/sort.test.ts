@@ -6,6 +6,8 @@ import type { WishlistCard } from '../../webview/extract';
 import { steamDiscountPercent } from '../../webview/extract';
 import {
   applyIgSort,
+  findSortPopup,
+  injectSortOption,
   installSortControl,
   loadSortActive,
   restoreOriginalOrder,
@@ -118,6 +120,42 @@ describe('IG-aware sorting', () => {
       '1',
       '2',
     ]);
+  });
+});
+
+describe('sort menu entry', () => {
+  function makePopup(): HTMLDivElement {
+    const popup = document.createElement('div');
+    popup.setAttribute('popover', 'manual');
+    popup.innerHTML = '<button>Name</button><button>Preis</button><button>Rabatt</button>';
+    document.body.appendChild(popup);
+    return popup;
+  }
+
+  it('finds the Steam sort popup by its option labels', () => {
+    const popup = makePopup();
+    expect(findSortPopup(document)).toBe(popup);
+  });
+
+  it('injects the IG option once and wires the native options', () => {
+    const popup = makePopup();
+    const onIg = vi.fn();
+    const onNative = vi.fn();
+
+    injectSortOption(popup, document, false, onIg, onNative);
+    const option = popup.querySelector<HTMLButtonElement>('[data-igdeals-sort-option]');
+    expect(option?.textContent).toBe('Rabatt inkl. IG');
+
+    option?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(onIg).toHaveBeenCalledWith(true);
+
+    injectSortOption(popup, document, true, onIg, onNative);
+    expect(popup.querySelectorAll('[data-igdeals-sort-option]')).toHaveLength(1);
+    expect(option?.classList.contains('igdeals-sort-option--active')).toBe(true);
+    expect(option?.getAttribute('aria-pressed')).toBe('true');
+
+    popup.querySelector<HTMLButtonElement>('button')?.click();
+    expect(onNative).toHaveBeenCalled();
   });
 });
 

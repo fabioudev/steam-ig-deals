@@ -19,9 +19,11 @@ The project is pre-alpha: anything may change, including the RPC contract.
   configured country's standard VAT rate (`shared/vat.ts`). The badge shows the
   gross amount without a separate tax note.
 - Store app pages show the same badge above the purchase box.
-- "IG-Rabatt" toggle next to Steam's sort button, reordering wishlist cards by
-  the best discount across Steam and Instant Gaming. The original order is
-  restored when the toggle is switched off.
+- "IG-Rabatt" toggle next to Steam's sort button and a matching "Rabatt inkl.
+  IG" entry inside Steam's sort popup, reordering wishlist cards by the best
+  discount across Steam and Instant Gaming. The original order is restored when
+  the toggle is switched off; picking a native Steam option turns IG sorting
+  off.
 - Development diagnostics for card counts and price comparisons, disabled by
   default.
 

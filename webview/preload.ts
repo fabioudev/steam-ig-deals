@@ -35,9 +35,12 @@ import { loadWishlistSettings, type WishlistSettings } from './settings';
 import {
   applyIgSort,
   installSortControl,
+  installSortMenu,
   loadSortActive,
   resetSortState,
   restoreOriginalOrder,
+  saveSortActive,
+  setSortButtonState,
 } from './sort';
 
 const BATCH_SIZE = 100;
@@ -84,6 +87,21 @@ function getLocale(): string | undefined {
   return language || undefined;
 }
 
+/** Apply a sort state coming from the toggle or the native sort popup. */
+function applySortState(active: boolean, restore: boolean): void {
+  sortActive = active;
+  saveSortActive(active);
+  setSortButtonState(document, active);
+
+  const cards = collectWishlistCards(document);
+  if (active) {
+    applyIgSort(cards, results);
+  } else if (restore) {
+    restoreOriginalOrder(cards);
+  }
+  scheduleRefresh(0);
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -122,16 +140,13 @@ async function refreshWishlist(currentGeneration: number): Promise<void> {
   const initialCards = collectWishlistCards(document);
   if (DEBUG) console.log(`[igdeals] wishlist cards found: ${initialCards.length}`);
 
-  installSortControl(document, (active) => {
-    sortActive = active;
-    const cards = collectWishlistCards(document);
-    if (active) {
-      applyIgSort(cards, results);
-    } else {
-      restoreOriginalOrder(cards);
-    }
-    scheduleRefresh(0);
-  });
+  installSortControl(document, (active) => applySortState(active, true));
+  installSortMenu(
+    document,
+    () => applySortState(true, false),
+    () => applySortState(false, false),
+    () => sortActive,
+  );
 
   if (initialCards.length === 0) return;
 

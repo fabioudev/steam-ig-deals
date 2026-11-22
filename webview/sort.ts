@@ -37,6 +37,12 @@ export function saveSortActive(active: boolean): void {
   }
 }
 
+/** Reflect the sort state on the standalone toggle, if it exists. */
+export function setSortButtonState(doc: Document, active: boolean): void {
+  const button = doc.getElementById(SORT_BUTTON_ID) as HTMLButtonElement | null;
+  if (button) setButtonState(button, active);
+}
+
 function setButtonState(button: HTMLButtonElement, active: boolean): void {
   button.classList.toggle(ACTIVE_CLASS, active);
   button.setAttribute('aria-pressed', String(active));
@@ -140,4 +146,107 @@ export function restoreOriginalOrder(cards: WishlistCard[]): void {
 /** Forget the captured order, e.g. after client-side navigation. */
 export function resetSortState(): void {
   originalAppIds = null;
+}
+
+/**
+ * Find Steam's open sort popup. The control uses the HTML popover API and
+ * renders plain option buttons ("Name", "Preis", "Rabatt", …). We match on the
+ * option labels instead of the hashed class names.
+ */
+export function findSortPopup(doc: Document): HTMLElement | null {
+  const popups = Array.from(
+    doc.querySelectorAll<HTMLElement>('[popover], [role="menu"], [role="listbox"]'),
+  );
+  const matching = popups.filter((popup) => {
+    const labels = Array.from(popup.querySelectorAll('button')).map((button) =>
+      (button.textContent ?? '').trim().toLowerCase(),
+    );
+    return labels.includes('rabatt') && (labels.includes('name') || labels.includes('preis'));
+  });
+  return matching.find((popup) => popup.getClientRects().length > 0) ?? matching[0] ?? null;
+}
+
+function closePopup(popup: HTMLElement): void {
+  const hide = (popup as HTMLElement & { hidePopover?: () => void }).hidePopover;
+  if (typeof hide === 'function') {
+    try {
+      hide.call(popup);
+      return;
+    } catch {
+      // Fall through to the style fallback.
+    }
+  }
+  popup.style.display = 'none';
+}
+
+/**
+ * Append "Rabatt inkl. IG" to an open sort popup. Idempotent; wiring is added
+ * once per native option so picking a Steam sort deactivates IG sorting
+ * without restoring the old order (Steam will reorder anyway).
+ */
+export function injectSortOption(
+  popup: HTMLElement,
+  doc: Document,
+  active: boolean,
+  onIgSelect: (active: boolean) => void,
+  onNativeSelect: () => void,
+): void {
+  let option = popup.querySelector<HTMLButtonElement>('[data-igdeals-sort-option]');
+  if (!option) {
+    option = doc.createElement('button');
+    option.type = 'button';
+    option.setAttribute('role', 'button');
+    option.className = 'Focusable igdeals-sort-option';
+    option.setAttribute('data-igdeals-sort-option', '');
+    option.textContent = 'Rabatt inkl. IG';
+    option.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onIgSelect(true);
+      closePopup(popup);
+    });
+    popup.appendChild(option);
+
+    for (const button of popup.querySelectorAll<HTMLButtonElement>(
+      'button:not([data-igdeals-sort-option])',
+    )) {
+      if (button.hasAttribute('data-igdeals-sort-native')) continue;
+      button.setAttribute('data-igdeals-sort-native', '');
+      button.addEventListener('click', () => onNativeSelect());
+    }
+  }
+
+  option.classList.toggle('igdeals-sort-option--active', active);
+  option.setAttribute('aria-pressed', String(active));
+}
+
+let menuListenerInstalled = false;
+
+/**
+ * Watch sort-button clicks and inject the extra option once the popup has
+ * rendered. Steam's popup opens asynchronously, hence the small delay.
+ */
+export function installSortMenu(
+  doc: Document,
+  onIgSelect: (active: boolean) => void,
+  onNativeSelect: () => void,
+  isActive: () => boolean,
+): void {
+  if (menuListenerInstalled) return;
+  menuListenerInstalled = true;
+
+  doc.addEventListener(
+    'click',
+    (event) => {
+      const target = event.target as Element | null;
+      const sortButton = target?.closest<HTMLElement>('button, [role="button"]');
+      if (!sortButton || !/sortieren nach|sort by/i.test(sortButton.textContent ?? '')) return;
+
+      window.setTimeout(() => {
+        const popup = findSortPopup(doc);
+        if (popup) injectSortOption(popup, doc, isActive(), onIgSelect, onNativeSelect);
+      }, 80);
+    },
+    true,
+  );
 }

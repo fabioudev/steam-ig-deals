@@ -154,13 +154,14 @@ falls back to price and discount only.
 
 ### Sorting
 
-Steam's sort menu is a React popup that does not open for programmatic events,
-so the plugin adds an "IG-Rabatt" toggle next to Steam's sort button instead of
-injecting a fragile fake option. When active, wishlist cards are reordered by
-the best available discount — `max(Steam discount, Instant Gaming discount)` —
-descending. The order before the first sort is captured and restored when the
-toggle is switched off. Only loaded cards are sorted; the wishlist loads lazily
-on scroll.
+Steam's sort menu is an HTML popover rendered asynchronously; the plugin appends
+a **"Rabatt inkl. IG"** option to it and keeps an "IG-Rabatt" toggle next to the
+sort button as a fallback. When active, wishlist cards are reordered by the best
+available discount — `max(Steam discount, Instant Gaming discount)` —
+descending. Picking a native Steam option turns IG sorting off without restoring
+the old order, so Steam's own sort wins. The order before the first IG sort is
+captured and restored when the toggle is switched off. Only loaded cards are
+sorted; the wishlist loads lazily on scroll.
 
 ## Compliance and safety
 

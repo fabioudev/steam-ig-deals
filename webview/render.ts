@@ -107,6 +107,20 @@ const STYLES = `
   outline: 2px solid #66c0f4;
   outline-offset: 2px;
 }
+.igdeals-sort-option {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.igdeals-sort-option:hover { background: rgba(255, 255, 255, 0.1); }
+.igdeals-sort-option--active { color: #ff8a15; font-weight: 700; }
 `;
 
 export type OpenUrl = (url: string) => void;
