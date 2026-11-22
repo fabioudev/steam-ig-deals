@@ -1,6 +1,6 @@
 {
   "name": "steam-ig-deals",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Millennium plugin that shows Instant Gaming prices and discounts on Steam wishlists and store pages.",

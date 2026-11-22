@@ -8,17 +8,17 @@ A [Millennium](https://steambrew.app) plugin that is meant to show current
 Instant Gaming prices and discounts next to the games you are already looking
 at — no manual searching, no copy-pasting titles.
 
-> **Status: pre-alpha.** Only the foundation exists: design, tooling, CI,
-> tests and documentation. The plugin is not usable yet and has not been
-> published. Everything listed under planned features is a goal, not a
-> shipped capability.
+> **Status: pre-alpha (0.2.0).** Wishlist, shop, search and app-page badges are
+> implemented and a `.star` release is available. IG sorting is currently
+> disabled because reordering Steam's virtualized wishlist proved unstable;
+> expect rough edges elsewhere as well.
 
 ![Wishlist badge mockup](docs/assets/wishlist-mockup.svg)
 
-## Planned features (v1)
+## Features
 
-- Orange Instant Gaming badge above every wishlist price, showing the gross
-  price (incl. VAT) and savings vs. Steam
+- Orange Instant Gaming badge on every wishlist card, showing the gross price
+  (incl. VAT) and savings vs. Steam
 - Price line on store app pages, placed above the purchase box, with a direct
   link to the product
 - Badges on the shop home page (sections, charts, carousels), search results and
@@ -30,8 +30,8 @@ at — no manual searching, no copy-pasting titles.
 - Local cache, configurable region/currency, no account, no telemetry
 - Windows and Linux, one plugin, no background service
 
-These are not implemented yet. See the [milestones](docs/design.md#milestones)
-for the order in which they are being built.
+IG sorting is currently disabled; the rest ships in 0.2.0. See the
+[milestones](docs/design.md#milestones) for what comes next.
 
 ## Requirements
 
@@ -53,11 +53,21 @@ To build from source:
 
 ## Installation
 
-There is no installable release yet: the plugin is not on
-[steambrew.app/plugins](https://steambrew.app/plugins) and no GitHub release has
-been tagged. The plugin id is `com.fabioudev.igdeals` (see `millennium.toml`).
+Download the latest `.star` from
+[GitHub Releases](https://github.com/fabioudev/steam-ig-deals/releases) and copy
+it into Millennium's plugin folder:
 
-Until the first tagged release, the only way to run it is from source:
+- Linux: `~/.local/share/millennium/plugins/`
+- Windows: `%STEAM%\millennium\plugins\`
+
+Restart Steam and enable **IG Deals for Steam** under
+**Millennium → Settings → Plugins**. The plugin is not listed on
+[steambrew.app/plugins](https://steambrew.app/plugins) yet.
+
+The plugin is pre-alpha: expect rough edges and keep a backup of the plugin
+folder. The id is `com.fabioudev.igdeals` (see `millennium.toml`).
+
+For development from source:
 
 ```sh
 git clone https://github.com/fabioudev/steam-ig-deals.git
@@ -67,10 +77,7 @@ npm run dev
 ```
 
 `npm run dev` builds the plugin, installs it into the Millennium installation
-Starlight detects, and watches for changes. Restart Steam or reload the UI if
-Millennium asks you to. Tagged releases will ship a `.star` artifact; the
-store listing and end-user installation instructions will be published once
-the plugin reaches a usable milestone.
+Starlight detects, and watches for changes.
 
 ## Development
 

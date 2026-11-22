@@ -9,11 +9,9 @@ The project is pre-alpha: anything may change, including the RPC contract.
 
 ## [Unreleased]
 
-### Changed
+Nothing yet.
 
-- Disabled the IG wishlist sorting in the shipped build: reordering Steam's
-  virtualized list from outside React was unstable while scrolling. Wishlist
-  badges are unaffected; a separate deals view is planned.
+## [0.2.0] - 2026-11-22
 
 ### Added
 
@@ -78,6 +76,12 @@ The project is pre-alpha: anything may change, including the RPC contract.
 - Badge price comparison uses the gross Instant Gaming price against Steam's
   gross price.
 
+### Changed
+
+- Disabled the IG wishlist sorting in the shipped build: reordering Steam's
+  virtualized list from outside React was unstable while scrolling. Wishlist
+  badges are unaffected; a separate deals view is planned.
+
 ## [0.1.0] - 2026-11-22
 
 ### Added
@@ -104,5 +108,6 @@ The project is pre-alpha: anything may change, including the RPC contract.
 - README with pre-alpha status, requirements, development commands, privacy
   and disclaimer sections.
 
-[Unreleased]: https://github.com/fabioudev/steam-ig-deals/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/fabioudev/steam-ig-deals/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/fabioudev/steam-ig-deals/releases/tag/v0.2.0
 [0.1.0]: https://github.com/fabioudev/steam-ig-deals/releases/tag/v0.1.0
