@@ -43,13 +43,11 @@ describe('badge display', () => {
 
     expect(display).not.toBeNull();
     expect(display?.tone).toBe('cheaper');
-    expect(display?.brandLabel).toBe('Instant Gaming');
     expect(display?.priceLabel).toContain('54,73');
     expect(display?.priceLabel).toContain('€');
-    expect(display?.taxLabel).toBe('inkl. 19 % MwSt.');
     expect(display?.discountLabel).toBe('−23 %');
     expect(display?.ariaLabel).toContain('Instant Gaming price');
-    expect(display?.ariaLabel).toContain('inkl. 19 % MwSt.');
+    expect(display?.ariaLabel).not.toContain('MwSt.');
     expect(display?.ariaLabel).toContain('cheaper than on Steam');
     expect(display?.title).toBe(display?.ariaLabel);
     expect(display?.url).toBe('https://www.instant-gaming.com/de/1234-kaufen-elden-ring/');
@@ -59,7 +57,6 @@ describe('badge display', () => {
     const display = buildBadgeDisplay(matched(), 59.99, 'de-DE');
 
     expect(display?.priceLabel).toContain('45,99');
-    expect(display?.taxLabel).toBeNull();
   });
 
   it('compares the gross price against Steam', () => {

@@ -22,14 +22,10 @@ export { hiddenReason } from './badge-state';
 export interface BadgeDisplay {
   /** Never `hidden`; a hidden result returns `null` instead. */
   tone: Exclude<BadgeTone, 'hidden'>;
-  /** Brand line, e.g. "Instant Gaming". */
-  brandLabel: string;
   /** Gross price for the configured country, e.g. "2,37 €". */
   priceLabel: string;
   /** e.g. "−23 %", or null when there is no known reference price. */
   discountLabel: string | null;
-  /** e.g. "inkl. 19 % MwSt.", or null when no VAT rate is known. */
-  taxLabel: string | null;
   /** Accessible name and hover title. */
   ariaLabel: string;
   title: string;
@@ -64,7 +60,6 @@ export function buildBadgeDisplay(
 
   const currency = product.currency || 'EUR';
   const formattedPrice = formatPrice(gross.amount, currency, locale);
-  const taxLabel = gross.vatPercent === null ? null : `inkl. ${gross.vatPercent} % MwSt.`;
 
   const percent =
     grossRetail !== null && grossRetail > gross.amount
@@ -76,17 +71,14 @@ export function buildBadgeDisplay(
   const comparison = tone === 'cheaper' ? 'cheaper than on Steam' : 'not cheaper than Steam prices';
   const discountCopy =
     discountLabel === null ? '' : `, ${roundedPercent} % below the reference price`;
-  const taxCopy = taxLabel === null ? '' : ` (${taxLabel})`;
   const ariaLabel =
-    `${product.name}: Instant Gaming price ${formattedPrice}${taxCopy}${discountCopy}; ` +
+    `${product.name}: Instant Gaming price ${formattedPrice}${discountCopy}; ` +
     `${comparison}. Opens the product page in your browser.`;
 
   return {
     tone,
-    brandLabel: 'Instant Gaming',
     priceLabel: formattedPrice,
     discountLabel,
-    taxLabel,
     ariaLabel,
     title: ariaLabel,
     url: product.url,

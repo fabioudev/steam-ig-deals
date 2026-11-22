@@ -32,6 +32,13 @@ import {
   upsertStoreBadge,
 } from './render';
 import { loadWishlistSettings, type WishlistSettings } from './settings';
+import {
+  applyIgSort,
+  installSortControl,
+  loadSortActive,
+  resetSortState,
+  restoreOriginalOrder,
+} from './sort';
 
 const BATCH_SIZE = 100;
 const DEBOUNCE_MS = 300;
@@ -43,6 +50,7 @@ interface PricesBackend {
 }
 
 let settings: WishlistSettings = loadWishlistSettings();
+let sortActive = loadSortActive();
 let backendWarned = false;
 let generation = 0;
 let lastUrl = '';
@@ -113,6 +121,18 @@ async function requestPrices(cards: WishlistCard[], currentGeneration: number): 
 async function refreshWishlist(currentGeneration: number): Promise<void> {
   const initialCards = collectWishlistCards(document);
   if (DEBUG) console.log(`[igdeals] wishlist cards found: ${initialCards.length}`);
+
+  installSortControl(document, (active) => {
+    sortActive = active;
+    const cards = collectWishlistCards(document);
+    if (active) {
+      applyIgSort(cards, results);
+    } else {
+      restoreOriginalOrder(cards);
+    }
+    scheduleRefresh(0);
+  });
+
   if (initialCards.length === 0) return;
 
   await requestPrices(initialCards, currentGeneration);
@@ -139,6 +159,10 @@ async function refreshWishlist(currentGeneration: number): Promise<void> {
       continue;
     }
     upsertCardBadge(card, display, openExternalUrl);
+  }
+
+  if (sortActive) {
+    applyIgSort(collectWishlistCards(document), results);
   }
 }
 
@@ -230,6 +254,8 @@ function onNavigation(): void {
   results.clear();
   inFlight.clear();
   settings = loadWishlistSettings();
+  sortActive = loadSortActive();
+  resetSortState();
   removeAllBadges();
   removeStoreBadge();
   scheduleRefresh(0);

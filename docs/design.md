@@ -143,11 +143,24 @@ number.
 
 ### UI
 
-The wishlist badge sits directly above Steam's price block, right-aligned, and
-uses Instant Gaming's orange palette: a small brand line, the gross price, the
-discount chip and an "inkl. … % MwSt." note. A green left border marks products
-that are cheaper than Steam. On store app pages the same badge is placed above
-the purchase box. External links open in the system browser.
+The wishlist badge sits directly above Steam's price element, right-aligned,
+and uses Instant Gaming's orange palette: the official logo (loaded from
+instant-gaming.com, not bundled), the gross price and the discount chip. No
+extra brand or tax text — the logo identifies the source and the price is
+gross. A green left border marks products that are cheaper than Steam. On
+store app pages the same badge is placed above the purchase box. External links
+open in the system browser. If the remote logo cannot be loaded, the badge
+falls back to price and discount only.
+
+### Sorting
+
+Steam's sort menu is a React popup that does not open for programmatic events,
+so the plugin adds an "IG-Rabatt" toggle next to Steam's sort button instead of
+injecting a fragile fake option. When active, wishlist cards are reordered by
+the best available discount — `max(Steam discount, Instant Gaming discount)` —
+descending. The order before the first sort is captured and restored when the
+toggle is switched off. Only loaded cards are sorted; the wishlist loads lazily
+on scroll.
 
 ## Compliance and safety
 

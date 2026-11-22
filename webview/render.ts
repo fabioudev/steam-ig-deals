@@ -13,7 +13,7 @@
 
 import type { BadgeDisplay } from './badge-model';
 import { openExternalUrl } from './external-link';
-import type { WishlistCard } from './extract';
+import { findPriceElement, type WishlistCard } from './extract';
 
 export const BADGE_ATTRIBUTE = 'data-igdeals-badge';
 export const BADGE_WRAP_ATTRIBUTE = 'data-igdeals-wrap';
@@ -21,6 +21,7 @@ export const BADGE_STYLE_ID = 'igdeals-styles';
 const BADGE_SELECTOR = `[${BADGE_ATTRIBUTE}]`;
 const WRAP_SELECTOR = `[${BADGE_WRAP_ATTRIBUTE}]`;
 const STORE_LINE_ID = 'igdeals-store-line';
+const LOGO_URL = 'https://www.instant-gaming.com/themes/igv2/images/logos/logo-instant-gaming.svg';
 
 const STYLES = `
 .igdeals-badge-wrap {
@@ -38,17 +39,16 @@ const STYLES = `
 .igdeals-badge {
   appearance: none;
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  padding: 6px 10px 6px 9px;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
   border: 0;
   border-radius: 4px;
-  background: linear-gradient(135deg, #ff7a1a 0%, #f4511e 100%);
+  background: linear-gradient(135deg, #ff8a15 0%, #ff3131 100%);
   color: #ffffff;
   font-family: "Motiva Sans", Arial, sans-serif;
   text-align: left;
-  line-height: 1.15;
+  line-height: 1.1;
   cursor: pointer;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
@@ -59,15 +59,15 @@ const STYLES = `
 }
 .igdeals-badge--cheaper { border-left: 3px solid #6cc644; }
 .igdeals-badge--neutral { opacity: 0.94; }
-.igdeals-badge__brand {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  opacity: 0.9;
+.igdeals-badge__logo {
+  display: block;
+  height: 13px;
+  width: auto;
+  filter: brightness(0) invert(1);
+  opacity: 0.95;
 }
 .igdeals-badge__row {
-  display: flex;
+  display: inline-flex;
   align-items: baseline;
   gap: 6px;
 }
@@ -83,13 +83,29 @@ const STYLES = `
   font-weight: 700;
   color: #ffe1c4;
 }
-.igdeals-badge__tax {
-  font-size: 9px;
-  opacity: 0.85;
+.igdeals-sort-toggle {
+  appearance: none;
+  margin-left: 8px;
+  padding: 0 12px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+  background: #2a475e;
+  color: #c7d5e0;
+  font-family: "Motiva Sans", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
-.igdeals-badge--block {
-  margin: 8px 0 12px;
-  padding: 7px 12px;
+.igdeals-sort-toggle:hover { background: #3a5a75; color: #ffffff; }
+.igdeals-sort-toggle--active {
+  background: linear-gradient(135deg, #ff8a15 0%, #ff3131 100%);
+  border-color: transparent;
+  color: #ffffff;
+}
+.igdeals-sort-toggle:focus-visible {
+  outline: 2px solid #66c0f4;
+  outline-offset: 2px;
 }
 `;
 
@@ -163,9 +179,7 @@ function updateBadge(
   }
   if (badge.getAttribute('title') !== display.title) badge.setAttribute('title', display.title);
 
-  const label = [display.brandLabel, display.priceLabel, display.discountLabel, display.taxLabel]
-    .filter(Boolean)
-    .join(' ');
+  const label = [display.priceLabel, display.discountLabel].filter(Boolean).join(' ');
   // Compare against a data attribute, not textContent: replacing textContent
   // would fire the MutationObserver and cause an endless render loop.
   if (badge.dataset.igdealsLabel === label) return;
@@ -173,9 +187,13 @@ function updateBadge(
   badge.dataset.igdealsLabel = label;
   badge.replaceChildren();
 
-  const brand = doc.createElement('span');
-  brand.className = 'igdeals-badge__brand';
-  brand.textContent = display.brandLabel;
+  const logo = doc.createElement('img');
+  logo.className = 'igdeals-badge__logo';
+  logo.src = LOGO_URL;
+  logo.alt = 'Instant Gaming';
+  logo.decoding = 'async';
+  logo.referrerPolicy = 'no-referrer';
+  logo.addEventListener('error', () => logo.remove(), { once: true });
 
   const row = doc.createElement('span');
   row.className = 'igdeals-badge__row';
@@ -192,15 +210,8 @@ function updateBadge(
     row.appendChild(discount);
   }
 
-  badge.appendChild(brand);
+  badge.appendChild(logo);
   badge.appendChild(row);
-
-  if (display.taxLabel) {
-    const tax = doc.createElement('span');
-    tax.className = 'igdeals-badge__tax';
-    tax.textContent = display.taxLabel;
-    badge.appendChild(tax);
-  }
 }
 
 function findBadge(root: ParentNode): HTMLButtonElement | null {
@@ -208,31 +219,6 @@ function findBadge(root: ParentNode): HTMLButtonElement | null {
 }
 
 const TITLE_SELECTORS = 'h1, h2, h3, h4, [role="heading"], .title';
-const PRICE_LABEL_RE = /[€$£]|rabatt|reduziert|discount|price|preis/i;
-
-/**
- * Locate the element that represents Steam's current price.
- *
- * The modern wishlist uses hashed class names, so there is no stable
- * `.discount_block` to target. The price link carries an aria-label such as
- * "90 % Rabatt. Regulärer Preis 23,99€ reduziert auf 2,39€." or its text
- * contains an amount; both survive Steam's class-name churn. The legacy
- * `.discount_block` is kept for older layouts and the test fixture.
- */
-function findPriceAnchor(container: HTMLElement): HTMLElement | null {
-  const legacyBlock = container.querySelector<HTMLElement>(
-    '.discount_block, .discount_block_large',
-  );
-  if (legacyBlock) return legacyBlock;
-
-  for (const node of container.querySelectorAll<HTMLElement>('[role="link"], a')) {
-    const label = node.getAttribute('aria-label') ?? '';
-    const text = (node.textContent ?? '').trim();
-    if (PRICE_LABEL_RE.test(label)) return node;
-    if (/[€$£]/.test(text) && text.length <= 120) return node;
-  }
-  return null;
-}
 
 /** Title element used when a card exposes no recognizable price element. */
 function findTitleAnchor(container: HTMLElement): HTMLElement | null {
@@ -263,7 +249,7 @@ export function upsertCardBadge(
   if (!badge) {
     badge = createBadge(doc, onOpen, false);
 
-    const priceAnchor = findPriceAnchor(container);
+    const priceAnchor = findPriceElement(container);
     let placed = false;
 
     if (priceAnchor) {

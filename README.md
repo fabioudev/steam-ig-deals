@@ -21,6 +21,8 @@ at — no manual searching, no copy-pasting titles.
   price (incl. VAT) and savings vs. Steam
 - Price line on store app pages, placed above the purchase box, with a direct
   link to the product
+- Optional "IG-Rabatt" sorting that ranks wishlist cards by the best discount
+  across Steam and Instant Gaming
 - Local cache, configurable region/currency, no account, no telemetry
 - Windows and Linux, one plugin, no background service
 

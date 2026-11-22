@@ -12,12 +12,16 @@ The project is pre-alpha: anything may change, including the RPC contract.
 ### Added
 
 - Wishlist badges anchored above Steam's price element, right-aligned, using
-  Instant Gaming's orange palette with a brand line, discount chip and a green
-  accent when the product is cheaper than Steam.
+  Instant Gaming's orange palette with the official logo (loaded from
+  instant-gaming.com), the gross price and a discount chip. A green accent
+  marks products that are cheaper than Steam.
 - Gross price display: Instant Gaming's net prices are converted with the
-  configured country's standard VAT rate (`shared/vat.ts`), labelled
-  "inkl. … % MwSt.".
+  configured country's standard VAT rate (`shared/vat.ts`). The badge shows the
+  gross amount without a separate tax note.
 - Store app pages show the same badge above the purchase box.
+- "IG-Rabatt" toggle next to Steam's sort button, reordering wishlist cards by
+  the best discount across Steam and Instant Gaming. The original order is
+  restored when the toggle is switched off.
 - Development diagnostics for card counts and price comparisons, disabled by
   default.
 

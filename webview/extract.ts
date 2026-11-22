@@ -233,6 +233,42 @@ export function findPriceScope(element: HTMLElement): HTMLElement {
   return element;
 }
 
+const PRICE_LABEL_RE = /[€$£]|rabatt|reduziert|discount|price|preis/i;
+
+/**
+ * Locate the element that represents Steam's current price.
+ *
+ * The modern wishlist uses hashed class names, so there is no stable
+ * `.discount_block` to target. The price link carries an aria-label such as
+ * "90 % Rabatt. Regulärer Preis 23,99€ reduziert auf 2,39€." or its text
+ * contains an amount; both survive Steam's class-name churn. The legacy
+ * `.discount_block` is kept for older layouts and the test fixture.
+ */
+export function findPriceElement(container: HTMLElement): HTMLElement | null {
+  const legacyBlock = container.querySelector<HTMLElement>(
+    '.discount_block, .discount_block_large',
+  );
+  if (legacyBlock) return legacyBlock;
+
+  for (const node of container.querySelectorAll<HTMLElement>('[role="link"], a')) {
+    const label = node.getAttribute('aria-label') ?? '';
+    const text = (node.textContent ?? '').trim();
+    if (PRICE_LABEL_RE.test(label)) return node;
+    if (/[€$£]/.test(text) && text.length <= 120) return node;
+  }
+  return null;
+}
+
+/** Steam's discount percentage for a wishlist card, 0 when unknown. */
+export function steamDiscountPercent(container: HTMLElement): number {
+  const price = findPriceElement(container);
+  const haystack = `${price?.getAttribute('aria-label') ?? ''} ${price?.textContent ?? ''}`;
+  const values = [...haystack.matchAll(/(\d{1,3})\s*%/g)]
+    .map((match) => Number(match[1]))
+    .filter((value) => Number.isFinite(value) && value > 0 && value <= 100);
+  return values.length > 0 ? Math.max(...values) : 0;
+}
+
 /** Read the game name on a store app page, with URL-slug fallback. */
 export function extractAppPageGame(
   doc: Document = document,

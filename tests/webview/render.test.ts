@@ -18,14 +18,12 @@ function makeDisplay(overrides: Partial<BadgeDisplay> = {}): BadgeDisplay {
   const url = 'https://www.instant-gaming.com/de/1234-kaufen-elden-ring/';
   return {
     tone: 'cheaper',
-    brandLabel: 'Instant Gaming',
     priceLabel: '54,73 €',
     discountLabel: '−23 %',
-    taxLabel: 'inkl. 19 % MwSt.',
     ariaLabel:
-      'ELDEN RING: Instant Gaming price 54,73 € (inkl. 19 % MwSt.), 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
+      'ELDEN RING: Instant Gaming price 54,73 €, 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
     title:
-      'ELDEN RING: Instant Gaming price 54,73 € (inkl. 19 % MwSt.), 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
+      'ELDEN RING: Instant Gaming price 54,73 €, 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
     url,
     ...overrides,
   };
@@ -65,10 +63,12 @@ describe('wishlist badge rendering', () => {
     expect(badge).not.toBeNull();
     if (!badge) return;
 
-    expect(badge.textContent).toContain('Instant Gaming');
     expect(badge.textContent).toContain('54,73');
     expect(badge.textContent).toContain('−23 %');
-    expect(badge.textContent).toContain('inkl. 19 % MwSt.');
+    expect(badge.textContent).not.toContain('inkl.');
+    const logo = badge.querySelector<HTMLImageElement>('.igdeals-badge__logo');
+    expect(logo?.alt).toBe('Instant Gaming');
+    expect(logo?.src).toContain('logo-instant-gaming.svg');
     expect(badge.tagName).toBe('BUTTON');
     expect(badge.getAttribute('href')).toBeNull();
     expect(badge.classList.contains('igdeals-badge--cheaper')).toBe(true);
@@ -132,7 +132,7 @@ describe('wishlist badge rendering', () => {
     const badge = badges[0];
     expect(badge?.classList.contains('igdeals-badge--neutral')).toBe(true);
     expect(badge?.classList.contains('igdeals-badge--cheaper')).toBe(false);
-    expect(badge?.textContent).toContain('Instant Gaming');
+    expect(badge?.textContent).toContain('68,00');
   });
 
   it('removes the badge for hidden results', () => {
