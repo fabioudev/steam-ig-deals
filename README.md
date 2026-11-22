@@ -21,9 +21,9 @@ at — no manual searching, no copy-pasting titles.
   price (incl. VAT) and savings vs. Steam
 - Price line on store app pages, placed above the purchase box, with a direct
   link to the product
-- Optional "Rabatt inkl. IG" sort entry in Steam's sort menu that ranks wishlist
-  cards by the best discount across Steam and Instant Gaming; the sort button
-  label reflects the active IG choice
+- Experimental IG sorting (currently disabled: reordering Steam's virtualized
+  wishlist from outside React proved unstable while scrolling). Wishlist badges
+  are unaffected.
 - Local cache, configurable region/currency, no account, no telemetry
 - Windows and Linux, one plugin, no background service
 

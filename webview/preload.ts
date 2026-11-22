@@ -24,19 +24,25 @@ import {
   type WishlistCard,
 } from './extract';
 import {
-  injectStyles,
-  removeAllBadges,
-  removeCardBadge,
-  removeStoreBadge,
-  upsertCardBadge,
-  upsertSkeleton,
-  upsertStoreBadge,
-} from './render';
+  attachOverlayListeners,
+  clearOverlay,
+  hasOverlayEntries,
+  isOverlayAttached,
+  pruneOverlay,
+  reattachOverlay,
+  removeOverlayBadge,
+  scheduleOverlayPosition,
+  showOverlayBadge,
+  showOverlaySkeleton,
+} from './overlay';
+import { injectStyles, removeAllBadges, removeStoreBadge, upsertStoreBadge } from './render';
 import { loadWishlistSettings, type WishlistSettings } from './settings';
 import {
+  appendNewCards,
   applyCachedSort,
   applyIgSort,
   clearSortStyles,
+  findSortPopup,
   installSortMenu,
   loadSortActive,
   saveSortActive,
@@ -44,7 +50,11 @@ import {
 } from './sort';
 
 const BATCH_SIZE = 100;
-const DEBOUNCE_MS = 300;
+// Keep the DEBOUNCE short enough that React re-renders do not visibly remove
+// badges, but not so short that virtualized scrolling turns into a storm.
+const DEBOUNCE_MS = 30;
+/** Reordering Steam's virtualized wishlist from the outside is unstable. */
+const SORT_ENABLED = false;
 /** Verbose console logging for development; keep off in releases. */
 const DEBUG = false;
 
@@ -53,10 +63,10 @@ interface PricesBackend {
 }
 
 let settings: WishlistSettings = loadWishlistSettings();
-let sortActive = loadSortActive();
+let sortActive = SORT_ENABLED && loadSortActive();
 let backendWarned = false;
 let generation = 0;
-let lastUrl = '';
+let lastPathKey = '';
 let refreshTimer: number | null = null;
 let observer: MutationObserver | null = null;
 let started = false;
@@ -89,6 +99,8 @@ function getLocale(): string | undefined {
 
 /** Apply a sort state coming from the toggle or the native sort popup. */
 function applySortState(active: boolean): void {
+  if (!SORT_ENABLED) return;
+
   sortActive = active;
   saveSortActive(active);
   setSortLabel(document, active);
@@ -98,6 +110,7 @@ function applySortState(active: boolean): void {
   } else {
     clearSortStyles(collectWishlistCards(document));
   }
+  scheduleOverlayPosition();
   scheduleRefresh(0);
 }
 
@@ -129,7 +142,7 @@ async function requestPrices(cards: WishlistCard[], currentGeneration: number): 
       for (const result of response.results) results.set(result.appid, result);
     } catch (error) {
       console.warn('[igdeals] get_prices failed', error);
-      for (const card of batch) removeCardBadge(card);
+      for (const card of batch) removeOverlayBadge(card.appid);
     } finally {
       for (const card of batch) inFlight.delete(card.appid);
     }
@@ -140,24 +153,35 @@ async function refreshWishlist(currentGeneration: number): Promise<void> {
   const initialCards = collectWishlistCards(document);
   if (DEBUG) console.log(`[igdeals] wishlist cards found: ${initialCards.length}`);
 
-  installSortMenu(
-    document,
-    () => applySortState(true),
-    () => applySortState(false),
-    () => sortActive,
-  );
-  setSortLabel(document, sortActive);
+  if (SORT_ENABLED) {
+    installSortMenu(
+      document,
+      () => applySortState(true),
+      () => applySortState(false),
+      () => sortActive,
+    );
+    setSortLabel(document, sortActive);
+  } else {
+    // Remove order styles left behind by an earlier plugin version.
+    const cards = collectWishlistCards(document);
+    if (
+      document.getElementById('igdeals-sort-styles') ||
+      cards.some((card) => card.element.hasAttribute('data-igdeals-appid'))
+    ) {
+      clearSortStyles(cards);
+    }
+  }
 
   if (initialCards.length === 0) return;
 
   // Show placeholders immediately, before waiting for Instant Gaming.
   if (getPricesBackend()) {
-    for (const card of initialCards) upsertSkeleton(card);
+    for (const card of initialCards) showOverlaySkeleton(card);
   }
 
   // Use the previous session's sort keys so the list does not visibly reorder
   // a second time when the prices arrive.
-  if (sortActive) {
+  if (SORT_ENABLED && sortActive) {
     applyCachedSort(collectWishlistCards(document));
   }
 
@@ -181,15 +205,20 @@ async function refreshWishlist(currentGeneration: number): Promise<void> {
       console.debug(
         `[igdeals] hiding badge for ${card.appid}: ${hiddenReason(result) ?? 'hidden'}`,
       );
-      removeCardBadge(card);
+      removeOverlayBadge(card.appid);
       continue;
     }
-    upsertCardBadge(card, display, openExternalUrl);
+    showOverlayBadge(card, display, document, openExternalUrl);
   }
 
-  if (sortActive) {
-    applyIgSort(collectWishlistCards(document), results);
+  const currentCards = collectWishlistCards(document);
+  // Drop badges for cards that React recycled for a different game.
+  pruneOverlay(new Set(currentCards.map((card) => card.appid)));
+
+  if (SORT_ENABLED && sortActive) {
+    appendNewCards(currentCards, results);
   }
+  scheduleOverlayPosition();
 }
 
 function steamPriceOnAppPage(): number | null {
@@ -241,6 +270,7 @@ async function refreshApp(appid: number, currentGeneration: number): Promise<voi
 
 async function refresh(): Promise<void> {
   if (!settings.badgeEnabled) {
+    clearOverlay();
     removeAllBadges();
     return;
   }
@@ -261,26 +291,68 @@ function scheduleRefresh(delay = DEBOUNCE_MS): void {
   }, delay);
 }
 
+const OUR_NODE_SELECTOR =
+  '[data-igdeals-badge], [data-igdeals-wrap], [data-igdeals-sort-option], #igdeals-overlay';
+
+function isOwnMutationNode(node: Node): boolean {
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  return element?.closest?.(OUR_NODE_SELECTOR) != null;
+}
+
 function startObserver(): void {
   if (observer) return;
-  observer = new MutationObserver(() => {
+  observer = new MutationObserver((mutations) => {
+    // React may drop the overlay when it re-renders the list/scroller.
+    if (hasOverlayEntries() && !isOverlayAttached()) {
+      reattachOverlay(document);
+      scheduleRefresh(0);
+      return;
+    }
+
+    // Ignore our own badge, skeleton, overlay and popup-option insertions.
+    const relevant = mutations.filter((mutation) => {
+      if (mutation.type !== 'childList') return true;
+      const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
+      return nodes.length === 0 || !nodes.every(isOwnMutationNode);
+    });
+    if (relevant.length === 0) return;
+
+    // Never touch the page while Steam's sort popup is open.
+    if (findSortPopup(document)) return;
+
+    // Re-apply the visual order immediately when React mounts new cards, so
+    // switching sorts does not leave the list in Steam's order for a moment.
+    if (SORT_ENABLED && sortActive) {
+      appendNewCards(collectWishlistCards(document), results);
+    }
+    scheduleOverlayPosition();
+
     // Debounced: React mounts cards in bursts and infinite scroll appends many
     // nodes at once. Idempotent rendering makes the extra passes inexpensive.
     scheduleRefresh();
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+/** Host + path identify a real page; query/hash changes (sorting, filters) do not. */
+function currentPathKey(): string {
+  return `${window.location.host}${window.location.pathname}`;
 }
 
 function onNavigation(): void {
-  const url = window.location.href;
-  if (url === lastUrl) return;
+  const pathKey = currentPathKey();
+  if (pathKey === lastPathKey) return;
 
-  lastUrl = url;
+  lastPathKey = pathKey;
   generation += 1;
   results.clear();
   inFlight.clear();
   settings = loadWishlistSettings();
-  sortActive = loadSortActive();
+  sortActive = SORT_ENABLED && loadSortActive();
+  clearOverlay();
   removeAllBadges();
   removeStoreBadge();
   scheduleRefresh(0);
@@ -318,9 +390,11 @@ export default function startIgDeals(): void {
   started = true;
 
   if (DEBUG) console.log('[igdeals] preload attached', window.location.href);
-  lastUrl = window.location.href;
+  lastPathKey = currentPathKey();
   settings = loadWishlistSettings();
   installNavigationHooks();
+  attachOverlayListeners();
+  removeAllBadges();
 
   const boot = (): void => {
     injectStyles();

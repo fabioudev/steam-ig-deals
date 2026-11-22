@@ -152,8 +152,20 @@ store app pages the same badge is placed above the purchase box. External links
 open in the system browser. If the remote logo cannot be loaded, the badge
 falls back to price and discount only. While prices are loading, a pulsing
 skeleton occupies the badge slot, so the list does not appear to load twice.
+Wishlist badges live in a fixed overlay outside Steam's React root and are
+positioned over each card's add-to-cart button (falling back to the price
+element) via `getBoundingClientRect`, updated on scroll and resize. React card
+re-renders therefore cannot remove them, which eliminated the badge flicker.
+URL changes are treated as navigation only when host or path changes; Steam's
+query/hash updates (sorting, filters) leave the overlay untouched.
 
 ### Sorting
+
+**Status: disabled in the current build** (`SORT_ENABLED = false` in the
+webview). Reordering Steam's virtualized, lazily loaded wishlist from outside
+React made the visible order change while scrolling and could not be made
+reliable; a separate "deals" view is the planned replacement. The rest of this
+section documents the attempt for future work.
 
 Steam's sort menu is an HTML popover rendered asynchronously; the plugin appends
 a **"Rabatt inkl. IG"** option to it and updates the sort button label while
@@ -161,12 +173,16 @@ that mode is active, so the control never shows the previous Steam sort while IG
 sorting is applied. When active, wishlist cards are reordered by the best
 available discount — `max(Steam discount, Instant Gaming discount)` —
 descending. Picking a native Steam option turns IG sorting off without restoring
-the old order, so Steam's own sort wins. The last sort keys are cached in
-`localStorage`, so a reload can apply the order immediately and does not visibly
-reorder a second time when the prices arrive. The list is switched to a flex
-column and cards receive CSS `order` values; moving React-managed cards made
-Steam remount the list and flash. Only loaded cards are sorted; the wishlist
-loads lazily on scroll.
+the old order, so Steam's own sort wins. The sorted order is stored as an
+appid → rank map and applied through a generated stylesheet that targets
+`data-igdeals-appid` attributes on the cards. React rewrites card inline styles
+but not our stylesheet, so a re-render cannot drop the order. Cards loaded later
+by infinite scroll are appended after the already placed ones instead of
+re-sorting the whole visible list, which used to make the order jump while
+scrolling; selecting "Rabatt inkl. IG" again re-sorts the currently loaded set.
+The list parent gets `data-igdeals-sorted` for the flex-column rule. The last
+sort keys are cached in `localStorage`, so a reload can apply the order
+immediately. Only loaded cards are sorted; the wishlist loads lazily on scroll.
 
 ## Compliance and safety
 

@@ -119,6 +119,17 @@ const STYLES = `
 }
 .igdeals-sort-option:hover { background: rgba(255, 255, 255, 0.1); }
 .igdeals-sort-option--active { color: #ff8a15; font-weight: 700; }
+.igdeals-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+.igdeals-badge--overlay {
+  position: fixed;
+  pointer-events: auto;
+  transform: translateY(calc(-100% - 6px));
+}
 `;
 
 export type OpenUrl = (url: string) => void;
@@ -297,6 +308,40 @@ export function upsertSkeleton(card: WishlistCard, doc: Document = document): vo
   badge.append(logo, price);
 
   placeCardBadge(card.element, badge, doc);
+}
+
+/**
+ * Overlay variants. The overlay lives outside Steam's React root, so a card
+ * re-render cannot remove the badge and make it flash away.
+ */
+export function createOverlayBadge(doc: Document, onOpen: OpenUrl): HTMLButtonElement {
+  const badge = createBadge(doc, onOpen, false);
+  badge.classList.add('igdeals-badge--overlay');
+  return badge;
+}
+
+export function updateOverlayBadge(
+  badge: HTMLButtonElement,
+  display: BadgeDisplay,
+  doc: Document,
+  appid: number,
+): void {
+  updateBadge(badge, display, doc, appid);
+}
+
+export function createOverlaySkeleton(doc: Document): HTMLElement {
+  const badge = doc.createElement('div');
+  badge.setAttribute(BADGE_ATTRIBUTE, '');
+  badge.setAttribute('data-igdeals-skeleton', '');
+  badge.setAttribute('aria-hidden', 'true');
+  badge.className = 'igdeals-badge igdeals-badge--skeleton igdeals-badge--overlay';
+
+  const logo = doc.createElement('span');
+  logo.className = 'igdeals-badge__skeleton-logo';
+  const price = doc.createElement('span');
+  price.className = 'igdeals-badge__skeleton-price';
+  badge.append(logo, price);
+  return badge;
 }
 
 /** Create or update the badge above the price inside one wishlist card. */

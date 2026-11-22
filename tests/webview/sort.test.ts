@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WishlistCard } from '../../webview/extract';
 import { steamDiscountPercent } from '../../webview/extract';
 import {
+  appendNewCards,
   applyCachedSort,
   applyIgSort,
   clearSortStyles,
@@ -56,6 +57,7 @@ beforeEach(() => {
   document.documentElement.lang = 'de';
   document.body.innerHTML = '';
   window.localStorage.clear();
+  clearSortStyles([]);
 });
 
 describe('steamDiscountPercent', () => {
@@ -71,11 +73,17 @@ describe('steamDiscountPercent', () => {
 });
 
 function visualOrder(list: HTMLElement): (string | null)[] {
+  const style = document.getElementById('igdeals-sort-styles')?.textContent ?? '';
+  const orderOf = (el: Element): number => {
+    const appid = el.getAttribute('data-igdeals-appid');
+    if (!appid) return 0;
+    const match = new RegExp(`\\[data-igdeals-appid="${appid}"\\]\\s*\\{\\s*order:\\s*(\\d+)`).exec(
+      style,
+    );
+    return match ? Number(match[1]) : 0;
+  };
   return Array.from(list.children)
-    .sort(
-      (a, b) =>
-        Number((a as HTMLElement).style.order || 0) - Number((b as HTMLElement).style.order || 0),
-    )
+    .sort((a, b) => orderOf(a) - orderOf(b))
     .map((el) => el.getAttribute('data-index'));
 }
 
@@ -96,7 +104,7 @@ describe('IG-aware sorting', () => {
 
     applyIgSort([a, b, c], results);
     expect(visualOrder(list)).toEqual(['2', '1', '3']);
-    expect(list.style.display).toBe('flex');
+    expect(list.hasAttribute('data-igdeals-sorted')).toBe(true);
     // The DOM order is untouched so React does not remount the list.
     expect(Array.from(list.children).map((el) => el.getAttribute('data-index'))).toEqual([
       '1',
@@ -141,6 +149,59 @@ describe('IG-aware sorting', () => {
     ]);
   });
 
+  it('appends newly loaded cards without moving the placed ones', () => {
+    const list = document.createElement('div');
+    const a = makeCard(1, 'Alpha', '<div class="discount_block">-50% 5,00 €</div>');
+    const b = makeCard(2, 'Beta', '<div class="discount_block">-20% 8,00 €</div>');
+    list.append(a.element, b.element);
+    document.body.appendChild(list);
+
+    const results = new Map<number, PriceResult>([
+      [1, matched(1, 10)],
+      [2, matched(2, 80)],
+    ]);
+    applyIgSort([a, b], results);
+    const attrA = a.element.getAttribute('data-igdeals-appid');
+    const attrB = b.element.getAttribute('data-igdeals-appid');
+
+    const c = makeCard(3, 'Gamma', '<div class="discount_block">-10% 9,00 €</div>');
+    list.appendChild(c.element);
+    const cResults = new Map<number, PriceResult>(results);
+    cResults.set(3, matched(3, 95));
+    appendNewCards([a, b, c], cResults);
+
+    // The placed cards keep their rank; the later card is appended.
+    expect(a.element.getAttribute('data-igdeals-appid')).toBe(attrA);
+    expect(b.element.getAttribute('data-igdeals-appid')).toBe(attrB);
+    expect(c.element.getAttribute('data-igdeals-appid')).toBe('3');
+    expect(visualOrder(list)).toEqual(['2', '1', '3']);
+  });
+
+  it('reapplies stored ranks after React rewrites card styles', () => {
+    const list = document.createElement('div');
+    const a = makeCard(1, 'Alpha', '<div class="discount_block">-50% 5,00 €</div>');
+    const b = makeCard(2, 'Beta', '<div class="discount_block">-20% 8,00 €</div>');
+    list.append(a.element, b.element);
+    document.body.appendChild(list);
+
+    applyIgSort(
+      [a, b],
+      new Map<number, PriceResult>([
+        [1, matched(1, 10)],
+        [2, matched(2, 80)],
+      ]),
+    );
+
+    // React rewrites the inline style attribute; the order lives in our
+    // stylesheet and on data attributes, so it must survive.
+    a.element.style.cssText = 'width:100%';
+    b.element.style.cssText = 'width:100%';
+
+    appendNewCards([a, b], new Map());
+    expect(visualOrder(list)).toEqual(['2', '1']);
+    expect(document.getElementById('igdeals-sort-styles')?.textContent).toContain('order:');
+  });
+
   it('ignores Instant Gaming results without stock', () => {
     const list = document.createElement('div');
     const a = makeCard(1, 'Alpha', '<div class="discount_block">-50% 5,00 €</div>');
@@ -162,12 +223,13 @@ describe('IG-aware sorting', () => {
     document.body.appendChild(list);
 
     applyIgSort([a, b], new Map([[1, matched(1, 10)]]));
-    expect(a.element.style.order).not.toBe('');
+    expect(a.element.hasAttribute('data-igdeals-appid')).toBe(true);
 
     clearSortStyles([a, b]);
-    expect(a.element.style.order).toBe('');
-    expect(b.element.style.order).toBe('');
-    expect(list.style.display).toBe('');
+    expect(a.element.hasAttribute('data-igdeals-appid')).toBe(false);
+    expect(b.element.hasAttribute('data-igdeals-appid')).toBe(false);
+    expect(list.hasAttribute('data-igdeals-sorted')).toBe(false);
+    expect(document.getElementById('igdeals-sort-styles')).toBeNull();
   });
 });
 
@@ -176,6 +238,7 @@ describe('sort menu entry', () => {
     const popup = document.createElement('div');
     popup.setAttribute('popover', 'manual');
     popup.innerHTML = '<button>Name</button><button>Preis</button><button>Rabatt</button>';
+    popup.getClientRects = () => ({ length: 1 }) as unknown as DOMRectList;
     document.body.appendChild(popup);
     return popup;
   }
