@@ -60,8 +60,8 @@ jobs:
           mkdir -p release
           cp "$star" "release/${name}.star"
           cp LICENSE README.md release/
-          (cd release && zip -9 -r "../${name}.zip" .)
-          sha256sum "${name}.zip" > SHA256SUMS
+          (cd release && zip -9 -r "${name}.zip" .)
+          sha256sum "release/${name}.zip" > SHA256SUMS
           (cd release && sha256sum "${name}.star") >> SHA256SUMS
           cat SHA256SUMS
 
