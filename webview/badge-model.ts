@@ -5,10 +5,15 @@
  * Display formatting is shared with the settings page through
  * `@shared/display`; keeping it there means the webview and the frontend use
  * the same separators, currency placement and rounding.
+ *
+ * Instant Gaming prices arrive net. The badge shows the gross price for the
+ * configured country (`shared/vat.ts`) and compares it against Steam's gross
+ * price, so the green "cheaper" state is a real saving.
  */
 
 import { classifyPrice, formatPrice, savingsPercent } from '@shared/display';
 import type { PriceResult } from '@shared/types';
+import { grossPrice } from '@shared/vat';
 import { type BadgeTone, decideTone } from './badge-state';
 
 export type { BadgeTone } from './badge-state';
@@ -17,10 +22,14 @@ export { hiddenReason } from './badge-state';
 export interface BadgeDisplay {
   /** Never `hidden`; a hidden result returns `null` instead. */
   tone: Exclude<BadgeTone, 'hidden'>;
-  /** e.g. "IG 45,99 €". */
+  /** Brand line, e.g. "Instant Gaming". */
+  brandLabel: string;
+  /** Gross price for the configured country, e.g. "2,37 €". */
   priceLabel: string;
   /** e.g. "−23 %", or null when there is no known reference price. */
   discountLabel: string | null;
+  /** e.g. "inkl. 19 % MwSt.", or null when no VAT rate is known. */
+  taxLabel: string | null;
   /** Accessible name and hover title. */
   ariaLabel: string;
   title: string;
@@ -38,20 +47,28 @@ export function buildBadgeDisplay(
   result: PriceResult,
   steamPrice: number | null,
   locale?: string,
+  country?: string | null,
 ): BadgeDisplay | null {
   if (result.status !== 'matched' || !result.product || !result.product.has_stock) return null;
 
   const product = result.product;
-  const tone = decideTone(result, steamPrice, classifyPrice);
+  const gross = grossPrice(product.price, country);
+  const grossRetail = product.retail === null ? null : grossPrice(product.retail, country).amount;
+
+  const comparisonResult: PriceResult = {
+    ...result,
+    product: { ...product, price: gross.amount },
+  };
+  const tone = decideTone(comparisonResult, steamPrice, classifyPrice);
   if (tone === 'hidden') return null;
 
   const currency = product.currency || 'EUR';
-  const formattedPrice = formatPrice(product.price, currency, locale);
-  const priceLabel = `IG ${formattedPrice}`;
+  const formattedPrice = formatPrice(gross.amount, currency, locale);
+  const taxLabel = gross.vatPercent === null ? null : `inkl. ${gross.vatPercent} % MwSt.`;
 
   const percent =
-    product.retail !== null && product.retail > product.price
-      ? savingsPercent(product.retail, product.price)
+    grossRetail !== null && grossRetail > gross.amount
+      ? savingsPercent(grossRetail, gross.amount)
       : product.discount;
   const roundedPercent = Number.isFinite(percent) ? Math.round(percent) : 0;
   const discountLabel = roundedPercent > 0 ? `−${roundedPercent} %` : null;
@@ -59,14 +76,17 @@ export function buildBadgeDisplay(
   const comparison = tone === 'cheaper' ? 'cheaper than on Steam' : 'not cheaper than Steam prices';
   const discountCopy =
     discountLabel === null ? '' : `, ${roundedPercent} % below the reference price`;
+  const taxCopy = taxLabel === null ? '' : ` (${taxLabel})`;
   const ariaLabel =
-    `${product.name}: Instant Gaming price ${formattedPrice}${discountCopy}; ` +
+    `${product.name}: Instant Gaming price ${formattedPrice}${taxCopy}${discountCopy}; ` +
     `${comparison}. Opens the product page in your browser.`;
 
   return {
     tone,
-    priceLabel,
+    brandLabel: 'Instant Gaming',
+    priceLabel: formattedPrice,
     discountLabel,
+    taxLabel,
     ariaLabel,
     title: ariaLabel,
     url: product.url,

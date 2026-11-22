@@ -1,26 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="420" viewBox="0 0 880 420" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="430" viewBox="0 0 880 430" role="img" aria-labelledby="title desc">
   <title id="title">Wishlist badge mockup</title>
-  <desc id="desc">Two Steam wishlist cards; the first shows an Instant Gaming price badge with 23 percent savings.</desc>
-  <rect width="880" height="420" fill="#1b2838"/>
+  <desc id="desc">Two Steam wishlist cards; each shows an orange Instant Gaming badge above the Steam price with the gross price and discount.</desc>
+  <defs>
+    <linearGradient id="ig" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff7a1a"/>
+      <stop offset="1" stop-color="#f4511e"/>
+    </linearGradient>
+  </defs>
+  <rect width="880" height="430" fill="#1b2838"/>
   <text x="40" y="52" fill="#c7d5e0" font-family="system-ui, sans-serif" font-size="22" font-weight="600">Wunschliste</text>
 
   <!-- Card 1 -->
-  <rect x="40" y="80" width="380" height="300" rx="8" fill="#16202d"/>
-  <rect x="40" y="80" width="380" height="150" rx="8" fill="#2a475e"/>
-  <text x="60" y="165" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="15">ELDEN RING</text>
-  <text x="60" y="272" fill="#c7d5e0" font-family="system-ui, sans-serif" font-size="19" font-weight="600">Elden Ring</text>
-  <text x="60" y="300" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="15">59,99 €</text>
+  <rect x="40" y="80" width="800" height="140" rx="8" fill="#16202d"/>
+  <rect x="56" y="96" width="150" height="108" rx="4" fill="#2a475e"/>
+  <text x="70" y="152" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="12">GREEN HELL</text>
+  <text x="224" y="128" fill="#c7d5e0" font-family="system-ui, sans-serif" font-size="20" font-weight="600">Green Hell</text>
+  <text x="224" y="152" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="13">5. Sept. 2019 · Survival, Open World</text>
 
-  <rect x="250" y="252" width="150" height="62" rx="6" fill="#1f3d2b" stroke="#4c9a5e" stroke-width="1.5"/>
-  <text x="266" y="278" fill="#a4d4ae" font-family="system-ui, sans-serif" font-size="13" font-weight="600">INSTANT GAMING</text>
-  <text x="266" y="300" fill="#ffffff" font-family="system-ui, sans-serif" font-size="17" font-weight="700">45,99 €  −23 %</text>
+  <!-- IG badge above the price -->
+  <rect x="620" y="96" width="200" height="52" rx="4" fill="url(#ig)"/>
+  <rect x="620" y="96" width="3" height="52" fill="#6cc644"/>
+  <text x="632" y="112" fill="#ffffff" font-family="system-ui, sans-serif" font-size="8" font-weight="700" letter-spacing="1.2">INSTANT GAMING</text>
+  <text x="632" y="131" fill="#ffffff" font-family="system-ui, sans-serif" font-size="15" font-weight="700">2,37 €</text>
+  <rect x="690" y="119" width="44" height="16" rx="2" fill="#000000" opacity="0.2"/>
+  <text x="696" y="131" fill="#ffe1c4" font-family="system-ui, sans-serif" font-size="11" font-weight="700">−91 %</text>
+  <text x="632" y="143" fill="#ffffff" opacity="0.85" font-family="system-ui, sans-serif" font-size="9">inkl. 19 % MwSt.</text>
+
+  <!-- Steam price -->
+  <rect x="620" y="158" width="200" height="46" rx="4" fill="#2a475e"/>
+  <text x="632" y="177" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="11">Steam</text>
+  <text x="632" y="196" fill="#c7d5e0" font-family="system-ui, sans-serif" font-size="16" font-weight="600">2,39 €</text>
 
   <!-- Card 2 -->
-  <rect x="460" y="80" width="380" height="300" rx="8" fill="#16202d"/>
-  <rect x="460" y="80" width="380" height="150" rx="8" fill="#2a475e"/>
-  <text x="480" y="165" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="15">HADES II</text>
-  <text x="480" y="272" fill="#c7d5e0" font-family="system-ui, sans-serif" font-size="19" font-weight="600">Hades II</text>
-  <text x="480" y="300" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="15">29,99 €</text>
+  <rect x="40" y="240" width="800" height="140" rx="8" fill="#16202d"/>
+  <rect x="56" y="256" width="150" height="108" rx="4" fill="#2a475e"/>
+  <text x="70" y="312" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="12">ORI AND THE BLIND FOREST</text>
+  <text x="224" y="288" fill="#c7d5e0" font-family="system-ui, sans-serif" font-size="20" font-weight="600">Ori and the Blind Forest</text>
+  <text x="224" y="312" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="13">27. Apr. 2016 · Plattformer</text>
 
-  <text x="40" y="405" fill="#5c6a75" font-family="system-ui, sans-serif" font-size="12">Mockup — actual styling follows Steam's theme.</text>
+  <rect x="620" y="256" width="200" height="52" rx="4" fill="url(#ig)"/>
+  <rect x="620" y="256" width="3" height="52" fill="#6cc644"/>
+  <text x="632" y="272" fill="#ffffff" font-family="system-ui, sans-serif" font-size="8" font-weight="700" letter-spacing="1.2">INSTANT GAMING</text>
+  <text x="632" y="291" fill="#ffffff" font-family="system-ui, sans-serif" font-size="15" font-weight="700">4,87 €</text>
+  <rect x="690" y="279" width="44" height="16" rx="2" fill="#000000" opacity="0.2"/>
+  <text x="696" y="291" fill="#ffe1c4" font-family="system-ui, sans-serif" font-size="11" font-weight="700">−80 %</text>
+  <text x="632" y="303" fill="#ffffff" opacity="0.85" font-family="system-ui, sans-serif" font-size="9">inkl. 19 % MwSt.</text>
+
+  <rect x="620" y="318" width="200" height="46" rx="4" fill="#2a475e"/>
+  <text x="632" y="337" fill="#8f98a0" font-family="system-ui, sans-serif" font-size="11">Steam</text>
+  <text x="632" y="356" fill="#c7d5e0" font-family="system-ui, sans-serif" font-size="16" font-weight="600">4,99 €</text>
+
+  <text x="40" y="415" fill="#5c6a75" font-family="system-ui, sans-serif" font-size="12">Mockup — Bruttopreise inkl. MwSt., echte Darstellung folgt dem Steam-Theme.</text>
 </svg>

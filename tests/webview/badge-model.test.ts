@@ -2,9 +2,10 @@ import type { PriceResult } from '@shared/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Vitest's default resolver does not read tsconfig `paths`; the app builds with
-// them. Point the alias at the real implementation so this stays an
+// them. Point the aliases at the real implementations so this stays an
 // end-to-end test of the formatter instead of a mock.
 vi.mock('@shared/display', async () => import('../../shared/display'));
+vi.mock('@shared/vat', async () => import('../../shared/vat'));
 
 import { buildBadgeDisplay } from '../../webview/badge-model';
 
@@ -37,27 +38,38 @@ beforeEach(() => {
 });
 
 describe('badge display', () => {
-  it('formats a green badge against a higher Steam price', () => {
-    const display = buildBadgeDisplay(matched(), 59.99, 'de-DE');
+  it('shows the gross price with VAT and a green tone against Steam', () => {
+    const display = buildBadgeDisplay(matched(), 59.99, 'de-DE', 'DE');
 
     expect(display).not.toBeNull();
     expect(display?.tone).toBe('cheaper');
-    expect(display?.priceLabel).toContain('IG');
-    expect(display?.priceLabel).toContain('45,99');
+    expect(display?.brandLabel).toBe('Instant Gaming');
+    expect(display?.priceLabel).toContain('54,73');
     expect(display?.priceLabel).toContain('€');
+    expect(display?.taxLabel).toBe('inkl. 19 % MwSt.');
     expect(display?.discountLabel).toBe('−23 %');
+    expect(display?.ariaLabel).toContain('Instant Gaming price');
+    expect(display?.ariaLabel).toContain('inkl. 19 % MwSt.');
     expect(display?.ariaLabel).toContain('cheaper than on Steam');
     expect(display?.title).toBe(display?.ariaLabel);
     expect(display?.url).toBe('https://www.instant-gaming.com/de/1234-kaufen-elden-ring/');
   });
 
-  it('formats a neutral badge when Steam is equal or cheaper', () => {
-    expect(buildBadgeDisplay(matched(), 45.99, 'de-DE')?.tone).toBe('neutral');
-    expect(buildBadgeDisplay(matched(), 30, 'de-DE')?.tone).toBe('neutral');
+  it('falls back to the net price without a known VAT rate', () => {
+    const display = buildBadgeDisplay(matched(), 59.99, 'de-DE');
+
+    expect(display?.priceLabel).toContain('45,99');
+    expect(display?.taxLabel).toBeNull();
+  });
+
+  it('compares the gross price against Steam', () => {
+    expect(buildBadgeDisplay(matched(), 54.73, 'de-DE', 'DE')?.tone).toBe('neutral');
+    expect(buildBadgeDisplay(matched(), 50, 'de-DE', 'DE')?.tone).toBe('neutral');
+    expect(buildBadgeDisplay(matched(), 55, 'de-DE', 'DE')?.tone).toBe('cheaper');
   });
 
   it('stays neutral when Steam shows no comparable price', () => {
-    const display = buildBadgeDisplay(matched(), null, 'de-DE');
+    const display = buildBadgeDisplay(matched(), null, 'de-DE', 'DE');
 
     expect(display?.tone).toBe('neutral');
     expect(display?.ariaLabel).toContain('not cheaper than Steam prices');

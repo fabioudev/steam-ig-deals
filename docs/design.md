@@ -131,6 +131,24 @@ Instant Gaming results carry no Steam app id, so matching is the core risk.
   whole wishlist on every visit.
 - Atomic writes (temp file + rename); corrupt cache is discarded, not fatal.
 
+### Prices and VAT
+
+Instant Gaming's search index exposes net prices; German buyers see the
+country's VAT added at checkout. The badge therefore shows the **gross** price
+for the configured country (`shared/vat.ts`, standard rates, best effort) and
+compares it with Steam's gross price. The discount label is computed from the
+gross retail price, so the percentage stays consistent. When no rate is known
+for a country, the net price is shown without a tax label rather than a wrong
+number.
+
+### UI
+
+The wishlist badge sits directly above Steam's price block, right-aligned, and
+uses Instant Gaming's orange palette: a small brand line, the gross price, the
+discount chip and an "inkl. … % MwSt." note. A green left border marks products
+that are cheaper than Steam. On store app pages the same badge is placed above
+the purchase box. External links open in the system browser.
+
 ## Compliance and safety
 
 - Prices are fetched from Instant Gaming's public search index, not from a

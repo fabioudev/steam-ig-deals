@@ -17,9 +17,10 @@ at — no manual searching, no copy-pasting titles.
 
 ## Planned features (v1)
 
-- Price badge on every wishlist card (Instant Gaming price and savings vs.
-  Steam)
-- Price line on store app pages with a direct link to the product
+- Orange Instant Gaming badge above every wishlist price, showing the gross
+  price (incl. VAT) and savings vs. Steam
+- Price line on store app pages, placed above the purchase box, with a direct
+  link to the product
 - Local cache, configurable region/currency, no account, no telemetry
 - Windows and Linux, one plugin, no background service
 

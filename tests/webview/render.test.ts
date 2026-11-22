@@ -18,12 +18,14 @@ function makeDisplay(overrides: Partial<BadgeDisplay> = {}): BadgeDisplay {
   const url = 'https://www.instant-gaming.com/de/1234-kaufen-elden-ring/';
   return {
     tone: 'cheaper',
-    priceLabel: 'IG 45,99 €',
+    brandLabel: 'Instant Gaming',
+    priceLabel: '54,73 €',
     discountLabel: '−23 %',
+    taxLabel: 'inkl. 19 % MwSt.',
     ariaLabel:
-      'ELDEN RING: Instant Gaming price 45,99 €, 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
+      'ELDEN RING: Instant Gaming price 54,73 € (inkl. 19 % MwSt.), 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
     title:
-      'ELDEN RING: Instant Gaming price 45,99 €, 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
+      'ELDEN RING: Instant Gaming price 54,73 € (inkl. 19 % MwSt.), 23 % below the reference price; cheaper than on Steam. Opens the product page in your browser.',
     url,
     ...overrides,
   };
@@ -63,9 +65,10 @@ describe('wishlist badge rendering', () => {
     expect(badge).not.toBeNull();
     if (!badge) return;
 
-    expect(badge.textContent).toContain('IG');
-    expect(badge.textContent).toContain('45,99');
+    expect(badge.textContent).toContain('Instant Gaming');
+    expect(badge.textContent).toContain('54,73');
     expect(badge.textContent).toContain('−23 %');
+    expect(badge.textContent).toContain('inkl. 19 % MwSt.');
     expect(badge.tagName).toBe('BUTTON');
     expect(badge.getAttribute('href')).toBeNull();
     expect(badge.classList.contains('igdeals-badge--cheaper')).toBe(true);
@@ -73,7 +76,21 @@ describe('wishlist badge rendering', () => {
     expect(badge.getAttribute('aria-label')).toContain('Instant Gaming price');
     expect(badge.title).toContain('cheaper than on Steam');
     expect(badge.dataset.igdealsUrl).toBe(display.url);
-    expect(badge.dataset.igdealsLabel).toContain('45,99');
+    expect(badge.dataset.igdealsLabel).toContain('54,73');
+  });
+
+  it('anchors the badge above the Steam price element', () => {
+    const card = collectWishlistCards(document)[0];
+    if (!card) throw new Error('fixture setup failed');
+
+    upsertCardBadge(card, makeDisplay(), vi.fn());
+
+    const priceElement = card.element.querySelector<HTMLElement>('.discount_block');
+    const wrapper = priceElement?.querySelector<HTMLElement>('[data-igdeals-wrap]');
+    expect(wrapper).not.toBeNull();
+    expect(wrapper?.classList.contains('igdeals-badge-wrap--anchored')).toBe(true);
+    expect(wrapper?.querySelector('[data-igdeals-badge]')).not.toBeNull();
+    expect(priceElement?.style.position).toBe('relative');
   });
 
   it('opens the product URL through the injected opener, not through navigation', () => {
@@ -101,7 +118,7 @@ describe('wishlist badge rendering', () => {
     const cheaper = makeDisplay();
     const neutral = makeDisplay({
       tone: 'neutral',
-      priceLabel: 'IG 65,00 €',
+      priceLabel: '68,00 €',
       discountLabel: null,
     });
     if (!card || !cheaper || !neutral) throw new Error('fixture setup failed');
@@ -115,7 +132,7 @@ describe('wishlist badge rendering', () => {
     const badge = badges[0];
     expect(badge?.classList.contains('igdeals-badge--neutral')).toBe(true);
     expect(badge?.classList.contains('igdeals-badge--cheaper')).toBe(false);
-    expect(badge?.textContent).toContain('IG');
+    expect(badge?.textContent).toContain('Instant Gaming');
   });
 
   it('removes the badge for hidden results', () => {
@@ -144,7 +161,7 @@ describe('store page price line', () => {
     const lines = document.querySelectorAll('#igdeals-store-line');
     expect(lines).toHaveLength(1);
     expect(lines[0]?.classList.contains('igdeals-badge--block')).toBe(true);
-    expect(lines[0]?.textContent).toContain('45,99');
+    expect(lines[0]?.textContent).toContain('54,73');
 
     removeStoreBadge();
     expect(document.querySelectorAll('#igdeals-store-line')).toHaveLength(0);

@@ -216,6 +216,23 @@ export function collectWishlistGames(root: ParentNode = document): SteamGame[] {
   return collectWishlistCards(root).map(({ appid, name }) => ({ appid, name }));
 }
 
+/**
+ * The card container used for badge placement can be narrower than the row
+ * that also holds Steam's price (hover previews and nested app links make the
+ * card detector stop early). Walk up to the nearest ancestor that exposes a
+ * price so the badge can compare against Steam instead of always staying
+ * neutral.
+ */
+export function findPriceScope(element: HTMLElement): HTMLElement {
+  let node: HTMLElement | null = element;
+  for (let depth = 0; node && depth < 8; depth += 1) {
+    if (node.querySelector('[data-price-final]')) return node;
+    if (/[€$£]/.test(node.textContent ?? '')) return node;
+    node = node.parentElement;
+  }
+  return element;
+}
+
 /** Read the game name on a store app page, with URL-slug fallback. */
 export function extractAppPageGame(
   doc: Document = document,

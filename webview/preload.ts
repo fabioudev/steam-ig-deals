@@ -20,6 +20,7 @@ import {
   detectPage,
   extractAppPageGame,
   extractSteamPrice,
+  findPriceScope,
   type WishlistCard,
 } from './extract';
 import {
@@ -34,6 +35,8 @@ import { loadWishlistSettings, type WishlistSettings } from './settings';
 
 const BATCH_SIZE = 100;
 const DEBOUNCE_MS = 300;
+/** Verbose console logging for development; keep off in releases. */
+const DEBUG = false;
 
 interface PricesBackend {
   get_prices(payload: GetPricesRequest): Promise<GetPricesResponse>;
@@ -109,7 +112,7 @@ async function requestPrices(cards: WishlistCard[], currentGeneration: number): 
 
 async function refreshWishlist(currentGeneration: number): Promise<void> {
   const initialCards = collectWishlistCards(document);
-  console.log(`[igdeals] wishlist cards found: ${initialCards.length}`);
+  if (DEBUG) console.log(`[igdeals] wishlist cards found: ${initialCards.length}`);
   if (initialCards.length === 0) return;
 
   await requestPrices(initialCards, currentGeneration);
@@ -121,11 +124,13 @@ async function refreshWishlist(currentGeneration: number): Promise<void> {
     const result = results.get(card.appid);
     if (!result) continue;
 
-    const display = buildBadgeDisplay(
-      result,
-      extractSteamPrice(card.element, settings.currency),
-      locale,
-    );
+    const steamPrice = extractSteamPrice(findPriceScope(card.element), settings.currency);
+    const display = buildBadgeDisplay(result, steamPrice, locale, settings.country);
+    if (display && DEBUG) {
+      console.debug(
+        `[igdeals] ${card.name}: steam=${steamPrice} ig=${result.product?.price} tone=${display.tone}`,
+      );
+    }
     if (!display) {
       console.debug(
         `[igdeals] hiding badge for ${card.appid}: ${hiddenReason(result) ?? 'hidden'}`,
@@ -175,7 +180,7 @@ async function refreshApp(appid: number, currentGeneration: number): Promise<voi
   const result = results.get(appid);
   if (!result) return;
 
-  const display = buildBadgeDisplay(result, steamPriceOnAppPage(), getLocale());
+  const display = buildBadgeDisplay(result, steamPriceOnAppPage(), getLocale(), settings.country);
   if (!display) {
     console.debug(`[igdeals] hiding store line for ${appid}: ${hiddenReason(result) ?? 'hidden'}`);
     removeStoreBadge();
@@ -261,7 +266,7 @@ export default function startIgDeals(): void {
   if (started) return;
   started = true;
 
-  console.log('[igdeals] preload attached', window.location.href);
+  if (DEBUG) console.log('[igdeals] preload attached', window.location.href);
   lastUrl = window.location.href;
   settings = loadWishlistSettings();
   installNavigationHooks();
