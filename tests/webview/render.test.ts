@@ -9,6 +9,7 @@ import {
   removeCardBadge,
   removeStoreBadge,
   upsertCardBadge,
+  upsertSkeleton,
   upsertStoreBadge,
 } from '../../webview/render';
 
@@ -50,6 +51,26 @@ describe('wishlist badge rendering', () => {
 
     expect(card.element.querySelectorAll('[data-igdeals-badge]')).toHaveLength(1);
     expect(document.querySelectorAll(`#${BADGE_STYLE_ID}`)).toHaveLength(1);
+  });
+
+  it('shows a loading skeleton until the real badge replaces it', () => {
+    const card = collectWishlistCards(document)[0];
+    if (!card) throw new Error('fixture setup failed');
+
+    upsertSkeleton(card);
+    upsertSkeleton(card);
+
+    const skeletons = card.element.querySelectorAll('[data-igdeals-skeleton]');
+    expect(skeletons).toHaveLength(1);
+    expect(skeletons[0]?.classList.contains('igdeals-badge--skeleton')).toBe(true);
+    expect(skeletons[0]?.getAttribute('aria-hidden')).toBe('true');
+
+    upsertCardBadge(card, makeDisplay(), vi.fn());
+
+    expect(card.element.querySelector('[data-igdeals-skeleton]')).toBeNull();
+    const badge = card.element.querySelector('[data-igdeals-badge]');
+    expect(badge?.tagName).toBe('BUTTON');
+    expect(card.element.querySelectorAll('[data-igdeals-badge]')).toHaveLength(1);
   });
 
   it('renders price, discount, tone and accessible labels', () => {

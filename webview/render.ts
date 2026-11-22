@@ -83,29 +83,27 @@ const STYLES = `
   font-weight: 700;
   color: #ffe1c4;
 }
-.igdeals-sort-toggle {
-  appearance: none;
-  margin-left: 8px;
-  padding: 0 12px;
-  height: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 3px;
-  background: #2a475e;
-  color: #c7d5e0;
-  font-family: "Motiva Sans", Arial, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
+.igdeals-badge--skeleton {
+  background: linear-gradient(135deg, rgba(255, 138, 21, 0.6), rgba(255, 49, 49, 0.6));
+  box-shadow: none;
+  cursor: default;
+  animation: igdeals-skeleton-pulse 1.1s ease-in-out infinite;
 }
-.igdeals-sort-toggle:hover { background: #3a5a75; color: #ffffff; }
-.igdeals-sort-toggle--active {
-  background: linear-gradient(135deg, #ff8a15 0%, #ff3131 100%);
-  border-color: transparent;
-  color: #ffffff;
+.igdeals-badge__skeleton-logo {
+  width: 46px;
+  height: 13px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.45);
 }
-.igdeals-sort-toggle:focus-visible {
-  outline: 2px solid #66c0f4;
-  outline-offset: 2px;
+.igdeals-badge__skeleton-price {
+  width: 40px;
+  height: 13px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.65);
+}
+@keyframes igdeals-skeleton-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 .igdeals-sort-option {
   display: block;
@@ -228,8 +226,8 @@ function updateBadge(
   badge.appendChild(row);
 }
 
-function findBadge(root: ParentNode): HTMLButtonElement | null {
-  return root.querySelector<HTMLButtonElement>(BADGE_SELECTOR);
+function findBadge(root: ParentNode): HTMLElement | null {
+  return root.querySelector<HTMLElement>(BADGE_SELECTOR);
 }
 
 const TITLE_SELECTORS = 'h1, h2, h3, h4, [role="heading"], .title';
@@ -243,6 +241,62 @@ function findTitleAnchor(container: HTMLElement): HTMLElement | null {
     return node;
   }
   return null;
+}
+
+/** Place a badge (real button or skeleton) above the card's price element. */
+function placeCardBadge(container: HTMLElement, badge: HTMLElement, doc: Document): void {
+  const priceAnchor = findPriceElement(container);
+  if (priceAnchor) {
+    // Never nest a button inside an <a>: climb out of link wrappers first.
+    let top: HTMLElement = priceAnchor;
+    while (top.parentElement && top.parentElement.tagName === 'A') {
+      top = top.parentElement;
+    }
+    const parent = top.parentElement;
+    if (parent && parent !== container) {
+      parent.style.position = 'relative';
+      const wrapper = createWrapper(doc, true);
+      wrapper.appendChild(badge);
+      parent.insertBefore(wrapper, top);
+      return;
+    }
+    if (parent && top.tagName !== 'A') {
+      // Price element is a direct child of the card (legacy layouts): anchor
+      // the badge to the element itself.
+      top.style.position = 'relative';
+      const wrapper = createWrapper(doc, true);
+      wrapper.appendChild(badge);
+      top.appendChild(wrapper);
+      return;
+    }
+  }
+
+  const title = findTitleAnchor(container);
+  if (title?.parentElement) {
+    title.insertAdjacentElement('afterend', badge);
+  } else {
+    container.appendChild(badge);
+  }
+}
+
+/** Show a pulsing placeholder in the badge slot while prices are loading. */
+export function upsertSkeleton(card: WishlistCard, doc: Document = document): void {
+  injectStyles(doc);
+  if (findBadge(card.element)) return;
+
+  const badge = doc.createElement('div');
+  badge.setAttribute(BADGE_ATTRIBUTE, '');
+  badge.setAttribute('data-igdeals-skeleton', '');
+  badge.setAttribute('aria-hidden', 'true');
+  badge.className = 'igdeals-badge igdeals-badge--skeleton';
+
+  const logo = doc.createElement('span');
+  logo.className = 'igdeals-badge__skeleton-logo';
+  const price = doc.createElement('span');
+  price.className = 'igdeals-badge__skeleton-price';
+  badge.append(logo, price);
+
+  placeCardBadge(card.element, badge, doc);
 }
 
 /** Create or update the badge above the price inside one wishlist card. */
@@ -260,47 +314,20 @@ export function upsertCardBadge(
   }
 
   let badge = findBadge(container);
-  if (!badge) {
-    badge = createBadge(doc, onOpen, false);
+  const wrapper = badge?.closest<HTMLElement>(WRAP_SELECTOR) ?? null;
 
-    const priceAnchor = findPriceElement(container);
-    let placed = false;
-
-    if (priceAnchor) {
-      // Never nest the button inside an <a>: climb out of link wrappers first.
-      let top: HTMLElement = priceAnchor;
-      while (top.parentElement && top.parentElement.tagName === 'A') {
-        top = top.parentElement;
-      }
-      const parent = top.parentElement;
-      if (parent && parent !== container) {
-        parent.style.position = 'relative';
-        const wrapper = createWrapper(doc, true);
-        wrapper.appendChild(badge);
-        parent.insertBefore(wrapper, top);
-        placed = true;
-      } else if (parent && top.tagName !== 'A') {
-        // Price element is a direct child of the card (legacy layouts): anchor
-        // the badge to the element itself.
-        top.style.position = 'relative';
-        const wrapper = createWrapper(doc, true);
-        wrapper.appendChild(badge);
-        top.appendChild(wrapper);
-        placed = true;
-      }
+  if (!badge || badge.hasAttribute('data-igdeals-skeleton') || badge.tagName !== 'BUTTON') {
+    badge?.remove();
+    const button = createBadge(doc, onOpen, false);
+    if (wrapper) {
+      wrapper.appendChild(button);
+    } else {
+      placeCardBadge(container, button, doc);
     }
-
-    if (!placed) {
-      const title = findTitleAnchor(container);
-      if (title?.parentElement) {
-        title.insertAdjacentElement('afterend', badge);
-      } else {
-        container.appendChild(badge);
-      }
-    }
+    badge = button;
   }
 
-  updateBadge(badge, display, doc, card.appid);
+  updateBadge(badge as HTMLButtonElement, display, doc, card.appid);
 }
 
 /** Remove the badge from one card (used for no_match/unavailable/error). */

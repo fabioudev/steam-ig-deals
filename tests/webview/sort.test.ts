@@ -5,14 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WishlistCard } from '../../webview/extract';
 import { steamDiscountPercent } from '../../webview/extract';
 import {
+  applyCachedSort,
   applyIgSort,
+  clearSortStyles,
   findSortPopup,
   injectSortOption,
-  installSortControl,
   loadSortActive,
-  restoreOriginalOrder,
-  SORT_BUTTON_ID,
   SORT_STORAGE_KEY,
+  saveSortActive,
+  setSortLabel,
 } from '../../webview/sort';
 
 function makeCard(appid: number, name: string, priceHtml: string): WishlistCard {
@@ -52,6 +53,7 @@ function matched(appid: number, discount: number, hasStock = true): PriceResult 
 }
 
 beforeEach(() => {
+  document.documentElement.lang = 'de';
   document.body.innerHTML = '';
   window.localStorage.clear();
 });
@@ -68,8 +70,17 @@ describe('steamDiscountPercent', () => {
   });
 });
 
+function visualOrder(list: HTMLElement): (string | null)[] {
+  return Array.from(list.children)
+    .sort(
+      (a, b) =>
+        Number((a as HTMLElement).style.order || 0) - Number((b as HTMLElement).style.order || 0),
+    )
+    .map((el) => el.getAttribute('data-index'));
+}
+
 describe('IG-aware sorting', () => {
-  it('sorts by the best discount across Steam and Instant Gaming', () => {
+  it('sorts by the best discount with flex order, without moving DOM nodes', () => {
     const list = document.createElement('div');
     const a = makeCard(1, 'Alpha', '<div class="discount_block">-50% 5,00 €</div>');
     const b = makeCard(2, 'Beta', '<div class="discount_block">-20% 8,00 €</div>');
@@ -84,22 +95,46 @@ describe('IG-aware sorting', () => {
     ]);
 
     applyIgSort([a, b, c], results);
+    expect(visualOrder(list)).toEqual(['2', '1', '3']);
+    expect(list.style.display).toBe('flex');
+    // The DOM order is untouched so React does not remount the list.
     expect(Array.from(list.children).map((el) => el.getAttribute('data-index'))).toEqual([
-      '2',
       '1',
+      '2',
       '3',
     ]);
 
-    // Idempotent: a second pass does not move anything.
+    // Idempotent: a second pass keeps the same visual order.
     applyIgSort([a, b, c], results);
-    expect(Array.from(list.children).map((el) => el.getAttribute('data-index'))).toEqual([
-      '2',
-      '1',
-      '3',
+    expect(visualOrder(list)).toEqual(['2', '1', '3']);
+  });
+
+  it('applies the cached order before prices arrive', () => {
+    const results = new Map<number, PriceResult>([
+      [1, matched(1, 10)],
+      [2, matched(2, 80)],
+      [3, { appid: 3, status: 'no_match' }],
     ]);
 
-    restoreOriginalOrder([a, b, c]);
-    expect(Array.from(list.children).map((el) => el.getAttribute('data-index'))).toEqual([
+    const first = document.createElement('div');
+    const a = makeCard(1, 'Alpha', '<div class="discount_block">-50% 5,00 €</div>');
+    const b = makeCard(2, 'Beta', '<div class="discount_block">-20% 8,00 €</div>');
+    const c = makeCard(3, 'Gamma', '<div class="discount_block">-30% 7,00 €</div>');
+    first.append(a.element, b.element, c.element);
+    document.body.appendChild(first);
+    applyIgSort([a, b, c], results);
+
+    // A fresh page: new elements in Steam's own DOM order.
+    const second = document.createElement('div');
+    const a2 = makeCard(1, 'Alpha', '<div class="discount_block">-50% 5,00 €</div>');
+    const b2 = makeCard(2, 'Beta', '<div class="discount_block">-20% 8,00 €</div>');
+    const c2 = makeCard(3, 'Gamma', '<div class="discount_block">-30% 7,00 €</div>');
+    second.append(a2.element, b2.element, c2.element);
+    document.body.appendChild(second);
+
+    applyCachedSort([a2, b2, c2]);
+    expect(visualOrder(second)).toEqual(['2', '1', '3']);
+    expect(Array.from(second.children).map((el) => el.getAttribute('data-index'))).toEqual([
       '1',
       '2',
       '3',
@@ -116,10 +151,23 @@ describe('IG-aware sorting', () => {
     const results = new Map<number, PriceResult>([[2, matched(2, 90, false)]]);
     applyIgSort([a, b], results);
 
-    expect(Array.from(list.children).map((el) => el.getAttribute('data-index'))).toEqual([
-      '1',
-      '2',
-    ]);
+    expect(visualOrder(list)).toEqual(['1', '2']);
+  });
+
+  it('clears the visual order when sorting is turned off', () => {
+    const list = document.createElement('div');
+    const a = makeCard(1, 'Alpha', '<div class="discount_block">-50% 5,00 €</div>');
+    const b = makeCard(2, 'Beta', '<div class="discount_block">-20% 8,00 €</div>');
+    list.append(a.element, b.element);
+    document.body.appendChild(list);
+
+    applyIgSort([a, b], new Map([[1, matched(1, 10)]]));
+    expect(a.element.style.order).not.toBe('');
+
+    clearSortStyles([a, b]);
+    expect(a.element.style.order).toBe('');
+    expect(b.element.style.order).toBe('');
+    expect(list.style.display).toBe('');
   });
 });
 
@@ -159,29 +207,29 @@ describe('sort menu entry', () => {
   });
 });
 
-describe('sort toggle', () => {
-  it("inserts next to Steam's sort button and persists the state", () => {
+describe('sort label', () => {
+  it('shows the IG choice instead of the stale native sort', () => {
     document.body.innerHTML = `
       <div>
         <button type="button">Sortieren nach: <span>Rabatt</span></button>
       </div>
     `;
-    const onChange = vi.fn();
-    installSortControl(document, onChange);
+    const span = document.querySelector('span') as HTMLElement;
 
-    const toggle = document.getElementById(SORT_BUTTON_ID) as HTMLButtonElement | null;
-    expect(toggle).not.toBeNull();
-    expect(toggle?.previousElementSibling?.textContent).toContain('Sortieren nach');
+    setSortLabel(document, true);
+    expect(span.textContent).toBe('Rabatt inkl. IG');
 
-    toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(onChange).toHaveBeenLastCalledWith(true);
-    expect(toggle?.classList.contains('igdeals-sort-toggle--active')).toBe(true);
+    // Idempotent, and deactivation leaves Steam's own label alone.
+    setSortLabel(document, true);
+    expect(span.textContent).toBe('Rabatt inkl. IG');
+    setSortLabel(document, false);
+    expect(span.textContent).toBe('Rabatt inkl. IG');
+  });
+
+  it('persists the sort state', () => {
+    expect(loadSortActive()).toBe(false);
+    saveSortActive(true);
     expect(loadSortActive()).toBe(true);
     expect(window.localStorage.getItem(SORT_STORAGE_KEY)).toBe('1');
-
-    toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(onChange).toHaveBeenLastCalledWith(false);
-    expect(toggle?.classList.contains('igdeals-sort-toggle--active')).toBe(false);
-    expect(loadSortActive()).toBe(false);
   });
 });

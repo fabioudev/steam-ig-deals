@@ -1,25 +1,22 @@
 /**
- * "IG-Rabatt" sort control.
+ * IG-aware wishlist sorting.
  *
- * Steam's own sort menu is a React popup that does not open for programmatic
- * clicks, so adding an option inside it is fragile. Instead the plugin adds a
- * sibling control next to Steam's sort button. When active, wishlist cards are
- * reordered by the best discount available: Steam's discount or Instant
- * Gaming's discount, whichever is larger.
+ * Steam's sort control opens an HTML popover with plain option buttons. The
+ * plugin appends a localized "Rabatt inkl. IG" / "Discount incl. IG" option and
+ * reflects the choice in the sort button label, so the control no longer shows
+ * the previous Steam sort while IG sorting is active.
  *
- * The cards live in a plain block container (not a flex column), so the order
- * is applied by moving the card elements. The MutationObserver in the preload
- * re-applies it after Steam re-renders.
+ * The list is switched to a flex column and the cards receive CSS `order`
+ * values. Moving React-managed DOM nodes made Steam remount the list (a visible
+ * flash), so the order is applied visually instead. The MutationObserver in the
+ * preload re-applies it after Steam re-renders.
  */
 
 import type { PriceResult } from '@shared/types';
 import { steamDiscountPercent, type WishlistCard } from './extract';
 
 export const SORT_STORAGE_KEY = 'igdeals.sortActive';
-export const SORT_BUTTON_ID = 'igdeals-sort-toggle';
-const ACTIVE_CLASS = 'igdeals-sort-toggle--active';
-
-let originalAppIds: number[] | null = null;
+const SORT_KEYS_STORAGE = 'igdeals.sortKeys';
 
 export function loadSortActive(): boolean {
   try {
@@ -37,18 +34,16 @@ export function saveSortActive(active: boolean): void {
   }
 }
 
-/** Reflect the sort state on the standalone toggle, if it exists. */
-export function setSortButtonState(doc: Document, active: boolean): void {
-  const button = doc.getElementById(SORT_BUTTON_ID) as HTMLButtonElement | null;
-  if (button) setButtonState(button, active);
+function isGerman(doc: Document): boolean {
+  const lang =
+    (doc.documentElement.lang || (typeof navigator !== 'undefined' ? navigator.language : '')) ??
+    '';
+  return lang.toLowerCase().startsWith('de');
 }
 
-function setButtonState(button: HTMLButtonElement, active: boolean): void {
-  button.classList.toggle(ACTIVE_CLASS, active);
-  button.setAttribute('aria-pressed', String(active));
-  button.title = active
-    ? 'Sortiert nach dem besten Rabatt (Steam oder Instant Gaming). Klicken zum Ausschalten.'
-    : 'Nach dem besten Rabatt sortieren (Steam oder Instant Gaming).';
+/** Localized label used both in the popup and on the sort button. */
+export function sortOptionLabel(doc: Document): string {
+  return isGerman(doc) ? 'Rabatt inkl. IG' : 'Discount incl. IG';
 }
 
 function findSteamSortButton(doc: Document): HTMLElement | null {
@@ -60,36 +55,17 @@ function findSteamSortButton(doc: Document): HTMLElement | null {
 }
 
 /**
- * Insert the toggle next to Steam's sort button (idempotent). The callback
- * fires after the state flips so the caller can re-sort or restore.
+ * While IG sorting is active, show it on Steam's sort button instead of the
+ * stale native selection. Idempotent; the preload calls it on every refresh so
+ * a React re-render cannot leave the old label behind.
  */
-export function installSortControl(doc: Document, onChange: (active: boolean) => void): void {
-  const existing = doc.getElementById(SORT_BUTTON_ID) as HTMLButtonElement | null;
-  if (existing) {
-    setButtonState(existing, loadSortActive());
-    return;
+export function setSortLabel(doc: Document, active: boolean): void {
+  if (!active) return;
+  const label = findSteamSortButton(doc)?.querySelector<HTMLElement>('span');
+  const text = sortOptionLabel(doc);
+  if (label && label.textContent !== text) {
+    label.textContent = text;
   }
-
-  const sortButton = findSteamSortButton(doc);
-  if (!sortButton?.parentElement) return;
-
-  const button = doc.createElement('button');
-  button.id = SORT_BUTTON_ID;
-  button.type = 'button';
-  button.className = 'igdeals-sort-toggle Focusable';
-  button.textContent = 'IG-Rabatt';
-  setButtonState(button, loadSortActive());
-
-  button.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const active = !button.classList.contains(ACTIVE_CLASS);
-    setButtonState(button, active);
-    saveSortActive(active);
-    onChange(active);
-  });
-
-  sortButton.insertAdjacentElement('afterend', button);
 }
 
 function sortKey(card: WishlistCard, results: Map<number, PriceResult>): number {
@@ -103,6 +79,43 @@ function sortKey(card: WishlistCard, results: Map<number, PriceResult>): number 
 }
 
 /**
+ * Apply the visual order with CSS `order` instead of moving DOM nodes. Steam's
+ * list is React-managed; moving its children makes React remount cards (the
+ * list flashes empty and reappears). Flex order leaves the DOM untouched.
+ */
+function applyOrderStyles(parent: HTMLElement, sorted: WishlistCard[]): void {
+  if (window.getComputedStyle(parent).display !== 'flex') {
+    parent.style.display = 'flex';
+    parent.style.flexDirection = 'column';
+  }
+
+  sorted.forEach((card, index) => {
+    const value = String(index);
+    if (card.element.style.order !== value) card.element.style.order = value;
+  });
+}
+
+/** Remove the visual sort styles so Steam's own order is visible again. */
+export function clearSortStyles(cards: WishlistCard[]): void {
+  for (const card of cards) card.element.style.order = '';
+  const parent = cards[0]?.element.parentElement;
+  if (parent) {
+    parent.style.display = '';
+    parent.style.flexDirection = '';
+  }
+}
+
+function persistSortKeys(cards: WishlistCard[], results: Map<number, PriceResult>): void {
+  const keys: Record<string, number> = {};
+  for (const card of cards) keys[String(card.appid)] = sortKey(card, results);
+  try {
+    window.localStorage.setItem(SORT_KEYS_STORAGE, JSON.stringify(keys));
+  } catch {
+    // Storage can be unavailable; the next load just sorts a little later.
+  }
+}
+
+/**
  * Reorder the wishlist cards by the best available discount. Idempotent: the
  * DOM is only touched when the current order differs from the target.
  */
@@ -111,41 +124,45 @@ export function applyIgSort(cards: WishlistCard[], results: Map<number, PriceRes
   const parent = cards[0]?.element.parentElement;
   if (!parent) return;
 
-  if (!originalAppIds) originalAppIds = cards.map((card) => card.appid);
+  persistSortKeys(cards, results);
 
   const sorted = [...cards].sort((a, b) => {
     const delta = sortKey(b, results) - sortKey(a, results);
     return delta !== 0 ? delta : a.name.localeCompare(b.name);
   });
 
-  const desired = sorted.map((card) => card.element);
-  const current = Array.from(parent.children).filter(
-    (el): el is HTMLElement => el instanceof HTMLElement && el.matches('[data-index].Panel'),
-  );
-  if (current.length === desired.length && desired.every((el, index) => current[index] === el)) {
+  applyOrderStyles(parent, sorted);
+}
+
+/**
+ * Sort with the keys persisted by the previous session, before the backend has
+ * answered. This prevents the visible second reorder when the prices arrive.
+ */
+export function applyCachedSort(cards: WishlistCard[]): void {
+  if (cards.length < 2) return;
+
+  let keys: Record<string, unknown>;
+  try {
+    keys = JSON.parse(window.localStorage.getItem(SORT_KEYS_STORAGE) ?? '{}') as Record<
+      string,
+      unknown
+    >;
+  } catch {
     return;
   }
+  if (!keys || typeof keys !== 'object') return;
 
-  for (const card of sorted) {
-    parent.appendChild(card.element);
-  }
-}
+  const keyOf = (card: WishlistCard): number => {
+    const value = keys[String(card.appid)];
+    return typeof value === 'number' && Number.isFinite(value) ? value : -1;
+  };
+  if (cards.filter((card) => keyOf(card) >= 0).length < 2) return;
 
-/** Restore the order captured before the first IG sort, then forget it. */
-export function restoreOriginalOrder(cards: WishlistCard[]): void {
-  if (!originalAppIds) return;
-  const byAppId = new Map(cards.map((card) => [card.appid, card] as const));
-  for (const appid of originalAppIds) {
-    const card = byAppId.get(appid);
-    if (!card) continue;
-    card.element.parentElement?.appendChild(card.element);
-  }
-  originalAppIds = null;
-}
+  const parent = cards[0]?.element.parentElement;
+  if (!parent) return;
 
-/** Forget the captured order, e.g. after client-side navigation. */
-export function resetSortState(): void {
-  originalAppIds = null;
+  const sorted = [...cards].sort((a, b) => keyOf(b) - keyOf(a) || a.name.localeCompare(b.name));
+  applyOrderStyles(parent, sorted);
 }
 
 /**
@@ -161,7 +178,10 @@ export function findSortPopup(doc: Document): HTMLElement | null {
     const labels = Array.from(popup.querySelectorAll('button')).map((button) =>
       (button.textContent ?? '').trim().toLowerCase(),
     );
-    return labels.includes('rabatt') && (labels.includes('name') || labels.includes('preis'));
+    const hasDiscount = labels.includes('rabatt') || labels.some((l) => l.includes('discount'));
+    const hasName = labels.includes('name');
+    const hasPrice = labels.includes('preis') || labels.includes('price');
+    return hasDiscount && (hasName || hasPrice);
   });
   return matching.find((popup) => popup.getClientRects().length > 0) ?? matching[0] ?? null;
 }
@@ -180,8 +200,8 @@ function closePopup(popup: HTMLElement): void {
 }
 
 /**
- * Append "Rabatt inkl. IG" to an open sort popup. Idempotent; wiring is added
- * once per native option so picking a Steam sort deactivates IG sorting
+ * Append the localized IG sort option to an open popup. Idempotent; wiring is
+ * added once per native option so picking a Steam sort deactivates IG sorting
  * without restoring the old order (Steam will reorder anyway).
  */
 export function injectSortOption(
@@ -198,7 +218,6 @@ export function injectSortOption(
     option.setAttribute('role', 'button');
     option.className = 'Focusable igdeals-sort-option';
     option.setAttribute('data-igdeals-sort-option', '');
-    option.textContent = 'Rabatt inkl. IG';
     option.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -216,6 +235,8 @@ export function injectSortOption(
     }
   }
 
+  const text = sortOptionLabel(doc);
+  if (option.textContent !== text) option.textContent = text;
   option.classList.toggle('igdeals-sort-option--active', active);
   option.setAttribute('aria-pressed', String(active));
 }

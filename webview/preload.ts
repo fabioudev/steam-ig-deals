@@ -29,18 +29,18 @@ import {
   removeCardBadge,
   removeStoreBadge,
   upsertCardBadge,
+  upsertSkeleton,
   upsertStoreBadge,
 } from './render';
 import { loadWishlistSettings, type WishlistSettings } from './settings';
 import {
+  applyCachedSort,
   applyIgSort,
-  installSortControl,
+  clearSortStyles,
   installSortMenu,
   loadSortActive,
-  resetSortState,
-  restoreOriginalOrder,
   saveSortActive,
-  setSortButtonState,
+  setSortLabel,
 } from './sort';
 
 const BATCH_SIZE = 100;
@@ -88,16 +88,15 @@ function getLocale(): string | undefined {
 }
 
 /** Apply a sort state coming from the toggle or the native sort popup. */
-function applySortState(active: boolean, restore: boolean): void {
+function applySortState(active: boolean): void {
   sortActive = active;
   saveSortActive(active);
-  setSortButtonState(document, active);
+  setSortLabel(document, active);
 
-  const cards = collectWishlistCards(document);
   if (active) {
-    applyIgSort(cards, results);
-  } else if (restore) {
-    restoreOriginalOrder(cards);
+    applyIgSort(collectWishlistCards(document), results);
+  } else {
+    clearSortStyles(collectWishlistCards(document));
   }
   scheduleRefresh(0);
 }
@@ -130,6 +129,7 @@ async function requestPrices(cards: WishlistCard[], currentGeneration: number): 
       for (const result of response.results) results.set(result.appid, result);
     } catch (error) {
       console.warn('[igdeals] get_prices failed', error);
+      for (const card of batch) removeCardBadge(card);
     } finally {
       for (const card of batch) inFlight.delete(card.appid);
     }
@@ -140,15 +140,26 @@ async function refreshWishlist(currentGeneration: number): Promise<void> {
   const initialCards = collectWishlistCards(document);
   if (DEBUG) console.log(`[igdeals] wishlist cards found: ${initialCards.length}`);
 
-  installSortControl(document, (active) => applySortState(active, true));
   installSortMenu(
     document,
-    () => applySortState(true, false),
-    () => applySortState(false, false),
+    () => applySortState(true),
+    () => applySortState(false),
     () => sortActive,
   );
+  setSortLabel(document, sortActive);
 
   if (initialCards.length === 0) return;
+
+  // Show placeholders immediately, before waiting for Instant Gaming.
+  if (getPricesBackend()) {
+    for (const card of initialCards) upsertSkeleton(card);
+  }
+
+  // Use the previous session's sort keys so the list does not visibly reorder
+  // a second time when the prices arrive.
+  if (sortActive) {
+    applyCachedSort(collectWishlistCards(document));
+  }
 
   await requestPrices(initialCards, currentGeneration);
   if (currentGeneration !== generation) return;
@@ -270,7 +281,6 @@ function onNavigation(): void {
   inFlight.clear();
   settings = loadWishlistSettings();
   sortActive = loadSortActive();
-  resetSortState();
   removeAllBadges();
   removeStoreBadge();
   scheduleRefresh(0);

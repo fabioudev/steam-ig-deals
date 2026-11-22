@@ -150,18 +150,23 @@ extra brand or tax text — the logo identifies the source and the price is
 gross. A green left border marks products that are cheaper than Steam. On
 store app pages the same badge is placed above the purchase box. External links
 open in the system browser. If the remote logo cannot be loaded, the badge
-falls back to price and discount only.
+falls back to price and discount only. While prices are loading, a pulsing
+skeleton occupies the badge slot, so the list does not appear to load twice.
 
 ### Sorting
 
 Steam's sort menu is an HTML popover rendered asynchronously; the plugin appends
-a **"Rabatt inkl. IG"** option to it and keeps an "IG-Rabatt" toggle next to the
-sort button as a fallback. When active, wishlist cards are reordered by the best
+a **"Rabatt inkl. IG"** option to it and updates the sort button label while
+that mode is active, so the control never shows the previous Steam sort while IG
+sorting is applied. When active, wishlist cards are reordered by the best
 available discount — `max(Steam discount, Instant Gaming discount)` —
 descending. Picking a native Steam option turns IG sorting off without restoring
-the old order, so Steam's own sort wins. The order before the first IG sort is
-captured and restored when the toggle is switched off. Only loaded cards are
-sorted; the wishlist loads lazily on scroll.
+the old order, so Steam's own sort wins. The last sort keys are cached in
+`localStorage`, so a reload can apply the order immediately and does not visibly
+reorder a second time when the prices arrive. The list is switched to a flex
+column and cards receive CSS `order` values; moving React-managed cards made
+Steam remount the list and flash. Only loaded cards are sorted; the wishlist
+loads lazily on scroll.
 
 ## Compliance and safety
 
