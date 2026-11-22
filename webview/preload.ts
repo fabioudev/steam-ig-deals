@@ -17,6 +17,7 @@ import { buildBadgeDisplay, hiddenReason } from './badge-model';
 import { openExternalUrl } from './external-link';
 import {
   collectAppPageExtras,
+  collectAppPageSimilar,
   collectSearchCards,
   collectStoreCards,
   collectSuggestionCards,
@@ -339,7 +340,15 @@ async function refreshStoreList(
 }
 
 async function refreshAppExtras(primaryAppId: number, currentGeneration: number): Promise<void> {
-  const cards = collectAppPageExtras(document, primaryAppId);
+  const seen = new Set<HTMLElement>();
+  const cards = [
+    ...collectAppPageExtras(document, primaryAppId),
+    ...collectAppPageSimilar(document, primaryAppId),
+  ].filter((card) => {
+    if (seen.has(card.element)) return false;
+    seen.add(card.element);
+    return true;
+  });
   if (cards.length === 0) return;
 
   const visible = cards.filter((card) => isNearViewport(card.element));

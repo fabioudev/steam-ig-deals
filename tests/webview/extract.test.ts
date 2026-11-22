@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   collectAppPageExtras,
+  collectAppPageSimilar,
   collectSearchCards,
   collectStoreCards,
   collectSuggestionCards,
@@ -158,6 +159,30 @@ describe('shop and search extraction', () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]?.appid).toBe(1245620);
     expect(cards[0]?.name).toBe('ELDEN RING');
+  });
+
+  it('collects related cards but skips the primary app and purchase area', () => {
+    document.body.innerHTML = `
+      <div id="appHubAppName">DREDGE</div>
+      <a data-ds-appid="1562430" href="https://store.steampowered.com/app/1562430/DREDGE/">
+        <div class="title">DREDGE</div>
+      </a>
+      <div class="recommendation">
+        <a data-ds-appid="2561450" href="https://store.steampowered.com/app/2561450/The_Iron_Rig/">
+          <div class="title">DREDGE - The Iron Rig</div>
+        </a>
+      </div>
+      <div id="game_area_purchase">
+        <div class="game_area_purchase_game">
+          <a data-ds-appid="999" href="https://store.steampowered.com/app/999/Excluded/">
+            <div class="title">Excluded package content</div>
+          </a>
+        </div>
+      </div>
+    `;
+
+    const cards = collectAppPageSimilar(document, 1562430);
+    expect(cards.map((card) => card.appid)).toEqual([2561450]);
   });
 
   it('collects DLC rows and purchase editions on an app page', () => {

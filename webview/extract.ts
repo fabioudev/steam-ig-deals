@@ -420,6 +420,25 @@ export function collectStoreCards(root: ParentNode = document): WishlistCard[] {
   return cards;
 }
 
+/**
+ * Related/recommended app cards on a store app page. Purchase and DLC areas are
+ * excluded because `collectAppPageExtras` already handles them, and the main
+ * app is excluded because its store badge is rendered in the purchase box.
+ */
+export function collectAppPageSimilar(
+  root: ParentNode = document,
+  primaryAppId: number | null = null,
+): WishlistCard[] {
+  return collectStoreCards(root).filter((card) => {
+    if (card.appid <= 0 || card.appid === primaryAppId) return false;
+    return (
+      card.element.closest(
+        '#game_area_purchase, .game_area_purchase_game, .game_area_dlc_list, .game_area_dlc_row',
+      ) === null
+    );
+  });
+}
+
 /** Rows in Steam's search autocomplete dropdown. */
 export function collectSuggestionCards(root: ParentNode = document): WishlistCard[] {
   const cards: WishlistCard[] = [];
